@@ -1,0 +1,103 @@
+{
+  "type": "FeatureCollection",
+  "name": "Norwegian Cities",
+  "crs": {
+    "type": "name",
+    "properties": {
+      "name": "EPSG:4326"
+    }
+  },
+  "features": [
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Oslo",
+        "population": 697549,
+        "type": "Hovedstad",
+        "description": "Norges hovedstad og største by"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [10.7522, 59.9139]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Bergen",
+        "population": 283929,
+        "type": "By",
+        "description": "Norges nest største by, kjent for Bryggen"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [5.3221, 60.3913]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Trondheim",
+        "population": 207595,
+        "type": "By",
+        "description": "Historisk by med Nidarosdomen"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [10.3951, 63.4305]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Stavanger",
+        "population": 144699,
+        "type": "By",
+        "description": "Oljebyen ved vestkysten"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [5.7331, 58.9700]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Tromsø",
+        "population": 77095,
+        "type": "By",
+        "description": "Paris i nord, kjent for nordlys"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [18.9560, 69.6492]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Drammen",
+        "population": 101859,
+        "type": "By",
+        "description": "Elvestad ved Drammenselva"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [10.2049, 59.7439]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Kristiansand",
+        "population": 65000,
+        "type": "By",
+        "description": "Sørlandets hovedstad"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [8.0059, 58.1467]
+      }
+    }
+  ]
+}

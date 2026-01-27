@@ -1,0 +1,27 @@
+{
+  "name": "oppgave-1-webutvikling-gis-kartografi",
+  "version": "1.0.0",
+  "description": "Interaktivt webkart med GeoJSON, OGC API og PostGIS - IS-218 Gruppe 10",
+  "main": "index.html",
+  "scripts": {
+    "start": "npx http-server -p 8080 -c-1",
+    "dev": "npx http-server -p 8080 -c-1"
+  },
+  "keywords": [
+    "gis",
+    "leaflet",
+    "geojson",
+    "postgis",
+    "webkart"
+  ],
+  "author": "Gruppe 10",
+  "license": "MIT",
+  "dependencies": {
+    "leaflet": "^1.9.4",
+    "proj4": "^2.9.2",
+    "proj4leaflet": "^1.0.2"
+  },
+  "devDependencies": {
+    "http-server": "^14.1.1"
+  }
+}

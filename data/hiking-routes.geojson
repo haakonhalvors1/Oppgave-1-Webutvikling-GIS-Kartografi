@@ -1,0 +1,71 @@
+{
+  "type": "FeatureCollection",
+  "name": "Norwegian Hiking Routes",
+  "crs": {
+    "type": "name",
+    "properties": {
+      "name": "EPSG:4326"
+    }
+  },
+  "features": [
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Besseggen",
+        "difficulty": "Middels",
+        "length_km": 14,
+        "duration_hours": 6,
+        "description": "En av Norges mest populære fjellturer"
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [8.4650, 61.4955],
+          [8.4700, 61.5000],
+          [8.4800, 61.5050],
+          [8.4900, 61.5100],
+          [8.5000, 61.5120]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Trolltunga",
+        "difficulty": "Krevende",
+        "length_km": 22,
+        "duration_hours": 10,
+        "description": "Ikonisk fjellformasjon over Ringedalsvatnet"
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [6.7400, 60.1240],
+          [6.7500, 60.1300],
+          [6.7600, 60.1350],
+          [6.7700, 60.1400],
+          [6.7400, 60.1450]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Preikestolen",
+        "difficulty": "Lett",
+        "length_km": 8,
+        "duration_hours": 4,
+        "description": "Berømt fjellformasjon over Lysefjorden"
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [6.1850, 58.9830],
+          [6.1870, 58.9850],
+          [6.1890, 58.9860],
+          [6.1900, 58.9867]
+        ]
+      }
+    }
+  ]
+}

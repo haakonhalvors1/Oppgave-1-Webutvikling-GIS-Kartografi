@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="no">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Interaktivt Webkart - GIS Kartografi</title>
+    
+    <!-- Leaflet CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    
+    <!-- Custom CSS -->
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <header>
+            <h1>🗺️ Interaktivt Webkart - Norge</h1>
+            <p>GeoJSON, OGC API og PostGIS Demonstrasjon</p>
+        </header>
+
+        <!-- Control Panel -->
+        <div class="control-panel">
+            <div class="control-section">
+                <h3>📍 Romlig Spørring</h3>
+                <div class="spatial-query">
+                    <label>Søk innenfor radius (km):</label>
+                    <input type="number" id="radius-input" value="100" min="10" max="500" step="10">
+                    <button id="search-btn" class="btn btn-primary">Søk nær markør</button>
+                    <div id="query-results" class="results-box"></div>
+                </div>
+            </div>
+
+            <div class="control-section">
+                <h3>🎨 Data-drevet Styling</h3>
+                <div class="styling-controls">
+                    <label>
+                        <input type="checkbox" id="toggle-population" checked>
+                        Størrelse basert på befolkning
+                    </label>
+                    <label>
+                        <input type="checkbox" id="toggle-colors" checked>
+                        Farge basert på kategori
+                    </label>
+                </div>
+            </div>
+
+            <div class="control-section">
+                <h3>🔄 Koordinatsystem</h3>
+                <div class="coord-display">
+                    <div>Museposisjon: <span id="mouse-coords">-</span></div>
+                    <div>Projeksjon: <span id="current-proj">EPSG:4326 (WGS84)</span></div>
+                </div>
+            </div>
+
+            <div class="control-section">
+                <h3>ℹ️ Informasjon</h3>
+                <div class="info-box">
+                    <p><strong>Datakilder:</strong></p>
+                    <ul>
+                        <li>✓ Lokale GeoJSON-filer</li>
+                        <li>✓ OGC API Features (simulert)</li>
+                        <li>✓ PostGIS database (via Docker)</li>
+                    </ul>
+                    <p><strong>Funksjoner:</strong></p>
+                    <ul>
+                        <li>Layer control (topp høyre)</li>
+                        <li>Interaktive popups</li>
+                        <li>Romlige spørringer</li>
+                        <li>Data-drevet styling</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+
+        <!-- Map Container -->
+        <div id="map"></div>
+
+        <!-- Legend -->
+        <div class="legend">
+            <h4>Tegnforklaring</h4>
+            <div class="legend-item">
+                <span class="legend-icon city"></span>
+                <span>Byer</span>
+            </div>
+            <div class="legend-item">
+                <span class="legend-icon park"></span>
+                <span>Nasjonalparker</span>
+            </div>
+            <div class="legend-item">
+                <span class="legend-icon route"></span>
+                <span>Turruter</span>
+            </div>
+            <div class="legend-item">
+                <span class="legend-icon poi"></span>
+                <span>Severdigheter</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Leaflet JS -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    
+    <!-- Proj4 for coordinate transformations -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/proj4/2.9.2/proj4.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/proj4leaflet/1.0.2/proj4leaflet.min.js"></script>
+    
+    <!-- Custom JavaScript -->
+    <script src="app.js"></script>
+</body>
+</html>

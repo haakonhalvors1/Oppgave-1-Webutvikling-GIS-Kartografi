@@ -1,0 +1,69 @@
+{
+  "type": "FeatureCollection",
+  "name": "Norwegian National Parks",
+  "crs": {
+    "type": "name",
+    "properties": {
+      "name": "EPSG:4326"
+    }
+  },
+  "features": [
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Jotunheimen Nasjonalpark",
+        "area_km2": 1151,
+        "established": 1980,
+        "description": "Norges høyeste fjell"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [[
+          [8.2, 61.3],
+          [8.7, 61.3],
+          [8.7, 61.7],
+          [8.2, 61.7],
+          [8.2, 61.3]
+        ]]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Hardangervidda Nasjonalpark",
+        "area_km2": 3422,
+        "established": 1981,
+        "description": "Norges største nasjonalpark"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [[
+          [7.0, 60.0],
+          [8.5, 60.0],
+          [8.5, 60.7],
+          [7.0, 60.7],
+          [7.0, 60.0]
+        ]]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Rondane Nasjonalpark",
+        "area_km2": 963,
+        "established": 1962,
+        "description": "Norges første nasjonalpark"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [[
+          [9.5, 61.7],
+          [10.2, 61.7],
+          [10.2, 62.1],
+          [9.5, 62.1],
+          [9.5, 61.7]
+        ]]
+      }
+    }
+  ]
+}
