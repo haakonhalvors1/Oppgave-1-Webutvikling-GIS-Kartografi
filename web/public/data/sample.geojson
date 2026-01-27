@@ -1,0 +1,20 @@
+{
+  "type": "FeatureCollection",
+  "features": [
+    {
+      "type": "Feature",
+      "properties": { "name": "Eksempel A", "category": "A", "value": 10 },
+      "geometry": { "type": "Point", "coordinates": [10.75, 59.91] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "name": "Eksempel B", "category": "B", "value": 25 },
+      "geometry": { "type": "Point", "coordinates": [10.68, 59.93] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "name": "Eksempel C", "category": "C", "value": 5 },
+      "geometry": { "type": "Point", "coordinates": [10.82, 59.9] }
+    }
+  ]
+}
