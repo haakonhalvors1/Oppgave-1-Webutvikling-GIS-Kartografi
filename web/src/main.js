@@ -3,6 +3,10 @@ import "./style.css";
 
 const config = {
   baseStyle: "https://basemaps.cartocdn.com/gl/positron-gl-style/style.json",
+  elveg: {
+    wmsUrl: "https://wms.geonorge.no/skwms1/wms.vegnett2",
+    layer: "vegnett2"
+  },
   nvdb: {
     baseUrl: "/nvdb",
     roadnetPath: "/vegnett/veglenkesekvenser",
@@ -29,7 +33,10 @@ root.innerHTML = `
       <h3>Lagstyring</h3>
       <div class="layer-list">
         <label class="control-row">
-          <input type="checkbox" id="toggle-roadnet" checked /> NVDB vegnett
+          <input type="checkbox" id="toggle-elveg" checked /> Elveg vegnett (WMS)
+        </label>
+        <label class="control-row">
+          <input type="checkbox" id="toggle-roadnet" /> NVDB vegnett (data)
         </label>
         <label class="control-row">
           <input type="checkbox" id="toggle-height" checked /> NVDB høydebegrensning
@@ -48,6 +55,7 @@ root.innerHTML = `
     <section>
       <h3>Tegnforklaring</h3>
       <div class="legend">
+        <div class="legend-row"><span class="legend-swatch elveg"></span>Vegnett (Elveg WMS)</div>
         <div class="legend-row"><span class="legend-swatch roadnet"></span>Vegnett (NVDB)</div>
         <div class="legend-row"><span class="legend-swatch height"></span>Høydebegrensning</div>
         <div class="legend-row"><span class="legend-swatch width"></span>Vegbredde (NVDB)</div>
@@ -75,6 +83,7 @@ const map = new maplibregl.Map({
 map.addControl(new maplibregl.NavigationControl(), "top-right");
 
 map.on("load", () => {
+  addElvegLayer();
   addNvdbRoadnetLayer();
   addNvdbHeightLayer();
   addNvdbWidthLayer();
@@ -84,6 +93,24 @@ map.on("load", () => {
 
 let nvdbFetchTimer;
 let nvdbRequestId = 0;
+
+function addElvegLayer() {
+  const wmsTileUrl = `${config.elveg.wmsUrl}?SERVICE=WMS&REQUEST=GetMap&VERSION=1.3.0&LAYERS=${config.elveg.layer}&STYLES=&FORMAT=image/png&TRANSPARENT=true&CRS=EPSG:3857&BBOX={bbox-epsg-3857}&WIDTH=256&HEIGHT=256`;
+  map.addSource("elveg-wms", {
+    type: "raster",
+    tiles: [wmsTileUrl],
+    tileSize: 256
+  });
+
+  map.addLayer({
+    id: "elveg-wms-layer",
+    type: "raster",
+    source: "elveg-wms",
+    paint: {
+      "raster-opacity": 0.85
+    }
+  });
+}
 
 function addNvdbRoadnetLayer() {
   map.addSource("nvdb-roadnet", {
@@ -95,6 +122,9 @@ function addNvdbRoadnetLayer() {
     id: "nvdb-roadnet-line",
     type: "line",
     source: "nvdb-roadnet",
+    layout: {
+      visibility: "none"
+    },
     paint: {
       "line-width": [
         "match",
@@ -434,10 +464,18 @@ map.on("moveend", () => {
 });
 
 const toggleRoadnet = document.getElementById("toggle-roadnet");
+const toggleElveg = document.getElementById("toggle-elveg");
 const toggleHeight = document.getElementById("toggle-height");
 const toggleWidth = document.getElementById("toggle-width");
 const toggleWeight = document.getElementById("toggle-weight");
 const loadSupabase = document.getElementById("load-supabase");
+
+toggleElveg.addEventListener("change", (event) => {
+  const visibility = event.target.checked ? "visible" : "none";
+  if (map.getLayer("elveg-wms-layer")) {
+    map.setLayoutProperty("elveg-wms-layer", "visibility", visibility);
+  }
+});
 
 toggleRoadnet.addEventListener("change", (event) => {
   const visibility = event.target.checked ? "visible" : "none";
