@@ -6,6 +6,9 @@
 - **Prosjektnavn:** _Fyll inn_
 - **TLDR (3 setninger):** _Hva løser kartet?_
 
+## Begrunnelse for kartvalg
+Vi bruker MapLibre GL JS fordi det er et åpent og lett kartbibliotek som støtter både vektor‑stil og eksterne OGC‑tjenester uten låsing til en leverandør. Kartverket Vegnett (WMS) brukes som ekstern OGC‑kilde for å sikre komplett vegdekning i hele Norge, mens et eget GeoJSON‑lag viser kun veier med restriksjoner (f.eks. maks høyde/vekt/bredde) for å muliggjøre filtrering for spesialkjøretøy. Bakgrunnskartet (Carto Positron) er nøytralt og gir god lesbarhet uten å konkurrere visuelt med veg‑ og restriksjonsdataene.
+
 ## Demo
 - Legg inn video/gif-lenke eller skjermbilde når klart.
 

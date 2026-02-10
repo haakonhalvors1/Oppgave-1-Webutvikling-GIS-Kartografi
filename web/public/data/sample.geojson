@@ -3,18 +3,75 @@
   "features": [
     {
       "type": "Feature",
-      "properties": { "name": "Eksempel A", "category": "A", "value": 10 },
-      "geometry": { "type": "Point", "coordinates": [10.75, 59.91] }
+      "properties": {
+        "name": "E18 Ring 1",
+        "road_class": "primary",
+        "maxheight": 4.2,
+        "maxweight": 50,
+        "maxwidth": 3.0
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [10.732, 59.910],
+          [10.745, 59.910],
+          [10.762, 59.909]
+        ]
+      }
     },
     {
       "type": "Feature",
-      "properties": { "name": "Eksempel B", "category": "B", "value": 25 },
-      "geometry": { "type": "Point", "coordinates": [10.68, 59.93] }
+      "properties": {
+        "name": "Kirkeveien",
+        "road_class": "secondary",
+        "maxheight": 3.8,
+        "maxweight": 32,
+        "maxwidth": 2.8
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [10.707, 59.931],
+          [10.719, 59.925],
+          [10.732, 59.920]
+        ]
+      }
     },
     {
       "type": "Feature",
-      "properties": { "name": "Eksempel C", "category": "C", "value": 5 },
-      "geometry": { "type": "Point", "coordinates": [10.82, 59.9] }
+      "properties": {
+        "name": "Frognerveien",
+        "road_class": "local",
+        "maxheight": 3.3,
+        "maxweight": 18,
+        "maxwidth": 2.4
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [10.707, 59.924],
+          [10.722, 59.918],
+          [10.737, 59.914]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Ring 3",
+        "road_class": "primary",
+        "maxheight": 4.8,
+        "maxweight": 60,
+        "maxwidth": 3.5
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [10.700, 59.944],
+          [10.732, 59.942],
+          [10.770, 59.940]
+        ]
+      }
     }
   ]
 }

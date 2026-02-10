@@ -2,9 +2,11 @@ import maplibregl from "maplibre-gl";
 import "./style.css";
 
 const config = {
-  baseStyle: "https://demotiles.maplibre.org/style.json",
-  staticGeoJson: "/data/sample.geojson",
-  externalOgcUrl: import.meta.env.VITE_EXTERNAL_OGC_URL,
+  baseStyle: "https://basemaps.cartocdn.com/gl/positron-gl-style/style.json",
+  staticGeoJson: "/data/norway_restrictions.geojson",
+  externalOgcUrl:
+    import.meta.env.VITE_EXTERNAL_OGC_URL ||
+    "https://wms.geonorge.no/skwms1/wms.vegnett2",
   supabase: {
     url: import.meta.env.VITE_SUPABASE_URL,
     key: import.meta.env.VITE_SUPABASE_KEY
@@ -15,8 +17,8 @@ const root = document.getElementById("app");
 root.innerHTML = `
   <aside class="panel">
     <p class="badge">Oppgave 1 • GIS</p>
-    <h1>Webkart-template</h1>
-    <p>Fyll inn dine datasett, OGC-endepunkt og (valgfritt) Supabase-tilkobling. Kjør via Docker for lokal utvikling.</p>
+    <h1>Kriseveier for spesialkjøretøy</h1>
+    <p>Viser alle veier via eksternt OGC-lag og filtrerer bort uegnede veier basert på kjøretøyets krav.</p>
 
     <section>
       <h3>Lagstyring</h3>
@@ -25,20 +27,10 @@ root.innerHTML = `
           <input type="checkbox" id="toggle-static" checked /> Statisk GeoJSON
         </label>
         <label class="control-row">
-          <input type="checkbox" id="toggle-ogc" checked /> Eksternt OGC-lag
+          <input type="checkbox" id="toggle-ogc" checked /> Kartverket Vegnett (WMS)
         </label>
       </div>
-      <p class="note">Erstatt kildene i <code>config</code> for dine datasett.</p>
-    </section>
-
-    <section>
-      <h3>Filter (attributt)</h3>
-      <div class="control-row">
-        <label for="value-min">Min. verdi</label>
-        <input id="value-min" type="number" min="0" step="1" value="0" style="width: 100px;" />
-        <button id="apply-filter">Bruk filter</button>
-      </div>
-      <p class="note">Bytt ut med din egen romlige eller SQL-baserte spørring.</p>
+      <p class="note">OGC-laget viser alle veier. GeoJSON viser kun veier med restriksjoner (OSM).</p>
     </section>
 
     <section>
@@ -53,8 +45,8 @@ root.innerHTML = `
 const map = new maplibregl.Map({
   container: "map",
   style: config.baseStyle,
-  center: [10.75, 59.91],
-  zoom: 10
+  center: [7.9956, 58.1467],
+  zoom: 11
 });
 
 map.addControl(new maplibregl.NavigationControl(), "top-right");
@@ -71,23 +63,35 @@ function addStaticGeoJsonLayer() {
   });
 
   map.addLayer({
-    id: "static-points",
-    type: "circle",
+    id: "static-roads",
+    type: "line",
     source: "static-geojson",
     paint: {
-      "circle-radius": 8,
-      "circle-color": [
+      "line-width": [
         "match",
-        ["get", "category"],
-        "A",
-        "#2563eb",
-        "B",
-        "#10b981",
-        "#f97316"
+        ["get", "highway"],
+        "motorway",
+        5,
+        "trunk",
+        4.5,
+        "primary",
+        4,
+        "secondary",
+        3,
+        2
       ],
-      "circle-stroke-color": "#0f172a",
-      "circle-stroke-width": 1.5,
-      "circle-opacity": 0.9
+      "line-color": [
+        "step",
+        ["to-number", ["get", "maxheight"]],
+        "#94a3b8",
+        3.5,
+        "#ef4444",
+        4.0,
+        "#f97316",
+        4.5,
+        "#22c55e"
+      ],
+      "line-opacity": 0.9
     }
   });
 
@@ -108,28 +112,30 @@ function addStaticGeoJsonLayer() {
     }
   });
 
-  map.on("click", "static-points", (event) => {
+  map.on("click", "static-roads", (event) => {
     const feature = event.features?.[0];
     if (!feature) return;
-    const { name, category, value } = feature.properties;
+    const { name, maxheight, maxweight, maxwidth, highway, ref } =
+      feature.properties;
     new maplibregl.Popup()
       .setLngLat(event.lngLat)
       .setHTML(
-        `<strong>${name}</strong><br/>Kategori: ${category}<br/>Verdi: ${value}`
+        `<strong>${name || ref || "Uten navn"}</strong><br/>Type: ${highway}<br/>Maks høyde: ${maxheight || "?"} m<br/>Maks vekt: ${maxweight || "?"} t<br/>Maks bredde: ${maxwidth || "?"} m`
       )
       .addTo(map);
   });
 }
 
 function addExternalOgcLayer() {
+  if (!config.externalOgcUrl) return;
   // Placeholder raster OGC (WMS/WMTS). Replace with your endpoint & params.
   map.addSource("external-ogc", {
     type: "raster",
     tiles: [
-      `${config.externalOgcUrl}?service=WMS&request=GetMap&layers=example&styles=&format=image/png&transparent=true&version=1.1.1&width=256&height=256&srs=EPSG:3857&bbox={bbox-epsg-3857}`
+      `${config.externalOgcUrl}?service=WMS&request=GetMap&layers=kommunalveg,fylkesveg,riksveg,europaveg,privatveg,skogsbilveg,gang_og_sykkelveg,sykkelveg,bilferjestrekning&styles=&format=image/png&transparent=true&version=1.1.1&width=256&height=256&srs=EPSG:3857&bbox={bbox-epsg-3857}`
     ],
     tileSize: 256,
-    attribution: "Eksternt OGC"
+    attribution: "Kartverket Vegnett"
   });
 
   map.addLayer({
@@ -142,25 +148,23 @@ function addExternalOgcLayer() {
 
 const toggleStatic = document.getElementById("toggle-static");
 const toggleOgc = document.getElementById("toggle-ogc");
-const valueMin = document.getElementById("value-min");
-const applyFilter = document.getElementById("apply-filter");
 const loadSupabase = document.getElementById("load-supabase");
-
-applyFilter.addEventListener("click", () => {
-  const min = Number(valueMin.value) || 0;
-  map.setFilter("static-points", [">=", ["get", "value"], min]);
-  map.setFilter("static-labels", [">=", ["get", "value"], min]);
-});
 
 toggleStatic.addEventListener("change", (event) => {
   const visibility = event.target.checked ? "visible" : "none";
-  map.setLayoutProperty("static-points", "visibility", visibility);
-  map.setLayoutProperty("static-labels", "visibility", visibility);
+  if (map.getLayer("static-roads")) {
+    map.setLayoutProperty("static-roads", "visibility", visibility);
+  }
+  if (map.getLayer("static-labels")) {
+    map.setLayoutProperty("static-labels", "visibility", visibility);
+  }
 });
 
 toggleOgc.addEventListener("change", (event) => {
   const visibility = event.target.checked ? "visible" : "none";
-  map.setLayoutProperty("external-ogc-layer", "visibility", visibility);
+  if (map.getLayer("external-ogc-layer")) {
+    map.setLayoutProperty("external-ogc-layer", "visibility", visibility);
+  }
 });
 
 if (config.supabase.url && config.supabase.key) {
