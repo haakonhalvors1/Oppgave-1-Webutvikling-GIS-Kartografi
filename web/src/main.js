@@ -140,14 +140,55 @@ function addNvdbRoadnetLayer() {
     }
   });
 
+  map.addLayer({
+    id: "nvdb-roadnet-direction",
+    type: "symbol",
+    source: "nvdb-roadnet",
+    layout: {
+      visibility: "none",
+      "symbol-placement": "line-center",
+      "text-field": ["coalesce", ["get", "bearingArrow"], "→"],
+      "text-size": 18,
+      "text-rotate": ["coalesce", ["get", "bearingDeg"], 0],
+      "text-rotation-alignment": "map",
+      "text-allow-overlap": true,
+      "text-ignore-placement": true
+    },
+    paint: {
+      "text-color": "#1d4ed8",
+      "text-halo-color": "#ffffff",
+      "text-halo-width": 1.25
+    }
+  });
+
   map.on("click", "nvdb-roadnet-line", (event) => {
     const feature = event.features?.[0];
     if (!feature) return;
-    const { typeVeg, veglenkesekvensid } = feature.properties;
+    const {
+      typeVeg,
+      veglenkesekvensid,
+      laneCount,
+      laneCodesText,
+      lanesWithDirectionCount,
+      lanesWithDirectionText,
+      lanesAgainstDirectionCount,
+      lanesAgainstDirectionText,
+      bearingArrow,
+      bearingCompass,
+      bearingDeg,
+      bearingArrowOpp,
+      bearingCompassOpp
+    } = feature.properties;
+
+    const bearingDegNumber = typeof bearingDeg === "number" ? bearingDeg : Number(bearingDeg);
     new maplibregl.Popup()
       .setLngLat(event.lngLat)
       .setHTML(
-        `<strong>Vegnett</strong><br/>Type: ${typeVeg || "Ukjent"}<br/>Veglenkesekvens: ${veglenkesekvensid || "?"}`
+        `<strong>Vegnett</strong><br/>Type: ${typeVeg || "Ukjent"}<br/>Veglenkesekvens: ${veglenkesekvensid || "?"}` +
+        `<br/>Lenkeretning: ${bearingArrow || "?"} ${bearingCompass || "?"}${Number.isFinite(bearingDegNumber) ? ` (${bearingDegNumber.toFixed(0)}°)` : ""}` +
+        `<br/>Kjørefelt totalt: ${laneCount ?? "?"}${laneCodesText ? ` (${laneCodesText})` : ""}` +
+        `<br/>Med lenkeretning (${bearingArrow || "?"}): ${lanesWithDirectionCount ?? "?"}${lanesWithDirectionText ? ` (${lanesWithDirectionText})` : ""}` +
+        `<br/>Mot lenkeretning (${bearingArrowOpp || "?"} ${bearingCompassOpp || "?"}): ${lanesAgainstDirectionCount ?? "?"}${lanesAgainstDirectionText ? ` (${lanesAgainstDirectionText})` : ""}`
       )
       .addTo(map);
   });
@@ -258,6 +299,40 @@ function parseLineString(wkt) {
   return coords.length ? coords : null;
 }
 
+function computeBearingDegrees(fromLngLat, toLngLat) {
+  if (!Array.isArray(fromLngLat) || !Array.isArray(toLngLat)) return null;
+  const [lon1, lat1] = fromLngLat;
+  const [lon2, lat2] = toLngLat;
+  if (![lon1, lat1, lon2, lat2].every((n) => Number.isFinite(n))) return null;
+
+  const toRad = (deg) => (deg * Math.PI) / 180;
+  const toDeg = (rad) => (rad * 180) / Math.PI;
+  const phi1 = toRad(lat1);
+  const phi2 = toRad(lat2);
+  const dLambda = toRad(lon2 - lon1);
+
+  const y = Math.sin(dLambda) * Math.cos(phi2);
+  const x =
+    Math.cos(phi1) * Math.sin(phi2) -
+    Math.sin(phi1) * Math.cos(phi2) * Math.cos(dLambda);
+  const theta = Math.atan2(y, x);
+  return (toDeg(theta) + 360) % 360;
+}
+
+function bearingToArrow(bearingDegrees) {
+  if (!Number.isFinite(bearingDegrees)) return "?";
+  const arrows = ["↑", "↗", "→", "↘", "↓", "↙", "←", "↖"];
+  const index = Math.round(bearingDegrees / 45) % 8;
+  return arrows[index];
+}
+
+function bearingToCompass(bearingDegrees) {
+  if (!Number.isFinite(bearingDegrees)) return "?";
+  const dirs = ["N", "NE", "E", "SE", "S", "SW", "W", "NW"];
+  const index = Math.round(bearingDegrees / 45) % 8;
+  return dirs[index];
+}
+
 function getBoundsBbox() {
   const bounds = map.getBounds();
   const west = bounds.getWest().toFixed(4);
@@ -283,11 +358,54 @@ async function fetchNvdbRoadnet(bbox, requestId) {
     for (const link of obj.veglenker || []) {
       const coords = parseLineString(link.geometri?.wkt);
       if (!coords) continue;
+
+      const bearingDeg =
+        coords.length >= 2
+          ? computeBearingDegrees(coords[0], coords[coords.length - 1])
+          : null;
+      const bearingArrow = bearingToArrow(bearingDeg);
+      const bearingCompass = bearingToCompass(bearingDeg);
+      const bearingOppDeg = Number.isFinite(bearingDeg) ? (bearingDeg + 180) % 360 : null;
+      const bearingArrowOpp = bearingToArrow(bearingOppDeg);
+      const bearingCompassOpp = bearingToCompass(bearingOppDeg);
+
+      const laneCodes = Array.isArray(link.feltoversikt) ? link.feltoversikt : [];
+      const lanesWithDirection = [];
+      const lanesAgainstDirection = [];
+      for (const code of laneCodes) {
+        const match = String(code ?? "").match(/^\d+/);
+        const laneNumber = match ? Number(match[0]) : NaN;
+        if (!Number.isFinite(laneNumber)) continue;
+        if (laneNumber % 2 === 0) {
+          lanesAgainstDirection.push(code);
+        } else {
+          lanesWithDirection.push(code);
+        }
+      }
+
+      const laneCodesText = laneCodes.length ? laneCodes.join(", ") : "";
+      const lanesWithDirectionText = lanesWithDirection.length
+        ? lanesWithDirection.join(", ")
+        : "";
+      const lanesAgainstDirectionText = lanesAgainstDirection.length
+        ? lanesAgainstDirection.join(", ")
+        : "";
       features.push({
         type: "Feature",
         properties: {
           typeVeg: link.typeVeg || "Ukjent",
-          veglenkesekvensid: sequenceId
+          veglenkesekvensid: sequenceId,
+          laneCount: laneCodes.length || null,
+          laneCodesText,
+          lanesWithDirectionCount: lanesWithDirection.length || null,
+          lanesWithDirectionText,
+          lanesAgainstDirectionCount: lanesAgainstDirection.length || null,
+          lanesAgainstDirectionText,
+          bearingDeg: Number.isFinite(bearingDeg) ? bearingDeg : null,
+          bearingArrow,
+          bearingCompass,
+          bearingArrowOpp,
+          bearingCompassOpp
         },
         geometry: {
           type: "LineString",
@@ -481,6 +599,9 @@ toggleRoadnet.addEventListener("change", (event) => {
   const visibility = event.target.checked ? "visible" : "none";
   if (map.getLayer("nvdb-roadnet-line")) {
     map.setLayoutProperty("nvdb-roadnet-line", "visibility", visibility);
+  }
+  if (map.getLayer("nvdb-roadnet-direction")) {
+    map.setLayoutProperty("nvdb-roadnet-direction", "visibility", visibility);
   }
 });
 
