@@ -37,10 +37,17 @@ root.innerHTML = `
           <input type="number" id="vehicle-width" min="0" step="0.1" placeholder="F.eks. 2.6" />
         </label>
         <label class="control-row">
+          <span class="control-label">Høyde (m)</span>
+          <input type="number" id="vehicle-height" min="0" step="0.1" placeholder="F.eks. 4.2" />
+        </label>
+        <label class="control-row">
           <input type="checkbox" id="toggle-hide-too-narrow" /> Skjul veier som er for smale
         </label>
+        <label class="control-row">
+          <input type="checkbox" id="toggle-hide-too-low" /> Skjul veier med for lav høyde
+        </label>
       </div>
-      <p class="note">Krever NVDB vegbredde (objekt 838). Ukjent bredde vises fortsatt.</p>
+      <p class="note">Krever NVDB vegbredde (objekt 838) og høydebegrensning (objekt 591). Ukjent verdi vises fortsatt.</p>
     </section>
 
     <section>
@@ -109,6 +116,9 @@ let nvdbRequestId = 0;
 
 let vehicleWidthMeters = null;
 let hideTooNarrowRoads = false;
+
+let vehicleHeightMeters = null;
+let hideTooLowRoads = false;
 
 function addElvegLayer() {
   const wmsTileUrl = `${config.elveg.wmsUrl}?SERVICE=WMS&REQUEST=GetMap&VERSION=1.3.0&LAYERS=${config.elveg.layer}&STYLES=&FORMAT=image/png&TRANSPARENT=true&CRS=EPSG:3857&BBOX={bbox-epsg-3857}&WIDTH=256&HEIGHT=256`;
@@ -179,10 +189,34 @@ function addNvdbRoadnetLayer() {
     }
   });
 
+  map.addLayer({
+    id: "nvdb-roadnet-too-low",
+    type: "line",
+    source: "nvdb-roadnet",
+    layout: {
+      visibility: "none"
+    },
+    filter: ["all", ["has", "clearanceM"], ["<", ["get", "clearanceM"], 0]],
+    paint: {
+      "line-width": [
+        "match",
+        ["get", "typeVeg"],
+        "Motorveg",
+        6,
+        "Enkel bilveg",
+        4,
+        3
+      ],
+      "line-color": "#ef4444",
+      "line-opacity": 0.9
+    }
+  });
+
   const handleRoadnetClick = (event) => {
     const feature = event.features?.[0];
     if (!feature) return;
-    const { typeVeg, veglenkesekvensid, widthText, widthM } = feature.properties;
+    const { typeVeg, veglenkesekvensid, widthText, widthM, clearanceText, clearanceM } =
+      feature.properties;
 
     const vehicleWidthText = Number.isFinite(vehicleWidthMeters)
       ? `${vehicleWidthMeters.toFixed(1)} m`
@@ -193,13 +227,28 @@ function addNvdbRoadnetLayer() {
         ? roadWidthNumber >= vehicleWidthMeters
         : null;
 
+    const vehicleHeightText = Number.isFinite(vehicleHeightMeters)
+      ? `${vehicleHeightMeters.toFixed(1)} m`
+      : null;
+    const roadClearanceNumber =
+      typeof clearanceM === "number" ? clearanceM : Number(clearanceM);
+    const passableHeight =
+      Number.isFinite(vehicleHeightMeters) && Number.isFinite(roadClearanceNumber)
+        ? roadClearanceNumber >= vehicleHeightMeters
+        : null;
+
     new maplibregl.Popup()
       .setLngLat(event.lngLat)
       .setHTML(
         `<strong>Vegnett</strong><br/>Type: ${typeVeg || "Ukjent"}<br/>Veglenkesekvens: ${veglenkesekvensid || "?"}` +
           `<br/>Vegbredde (NVDB): ${widthText || "Ukjent"}` +
+          `<br/>Høydebegrensning (NVDB): ${clearanceText || "Ukjent"}` +
           (vehicleWidthText
             ? `<br/>Kjøretøy: ${vehicleWidthText} → ${passable === null ? "ukjent" : passable ? "OK" : "FOR SMAL"}`
+            : "")
+          +
+          (vehicleHeightText
+            ? `<br/>Kjøretøyhøyde: ${vehicleHeightText} → ${passableHeight === null ? "ukjent" : passableHeight ? "OK" : "FOR LAV"}`
             : "")
       )
       .addTo(map);
@@ -207,6 +256,7 @@ function addNvdbRoadnetLayer() {
 
   map.on("click", "nvdb-roadnet-line", handleRoadnetClick);
   map.on("click", "nvdb-roadnet-too-narrow", handleRoadnetClick);
+  map.on("click", "nvdb-roadnet-too-low", handleRoadnetClick);
 }
 
 function addNvdbHeightLayer() {
@@ -420,27 +470,110 @@ function attachWidthToRoadnet(roadnet, widthLayer) {
   }
 }
 
+function attachHeightToRoadnet(roadnet, heightLayer) {
+  if (!roadnet?.features?.length || !heightLayer?.features?.length) return;
+
+  const heightPoints = [];
+  for (const feature of heightLayer.features) {
+    const coords = feature?.geometry?.coordinates;
+    const mid = lineMidpoint(coords);
+    if (!mid) continue;
+    const clearanceM = normalizeNumber(feature?.properties?.height);
+    if (!Number.isFinite(clearanceM)) continue;
+    heightPoints.push({ mid, clearanceM });
+  }
+
+  if (!heightPoints.length) return;
+
+  const cellSizeDegrees = 0.01;
+  const { index, cellKey } = buildSpatialIndex(heightPoints, cellSizeDegrees);
+  const maxMatchMeters = 75;
+
+  for (const feature of roadnet.features) {
+    const coords = feature?.geometry?.coordinates;
+    const mid = lineMidpoint(coords);
+    if (!mid) continue;
+
+    const [lon, lat] = mid;
+    const baseKey = cellKey(lon, lat);
+    const [baseXText, baseYText] = baseKey.split(":");
+    const baseX = Number(baseXText);
+    const baseY = Number(baseYText);
+
+    let best = null;
+    for (let dx = -1; dx <= 1; dx += 1) {
+      for (let dy = -1; dy <= 1; dy += 1) {
+        const key = `${baseX + dx}:${baseY + dy}`;
+        const bucket = index.get(key);
+        if (!bucket) continue;
+        for (const candidate of bucket) {
+          const dist = haversineMeters(mid, candidate.mid);
+          if (dist > maxMatchMeters) continue;
+          if (!best || dist < best.dist) {
+            best = { dist, clearanceM: candidate.clearanceM };
+          }
+        }
+      }
+    }
+
+    if (best) {
+      feature.properties = feature.properties || {};
+      feature.properties.clearanceM = best.clearanceM;
+      feature.properties.clearanceText = `${best.clearanceM.toFixed(1)} m`;
+    }
+  }
+}
+
 function updateVehicleWidthFilters() {
-  if (!map.getLayer("nvdb-roadnet-line") || !map.getLayer("nvdb-roadnet-too-narrow")) {
+  if (
+    !map.getLayer("nvdb-roadnet-line") ||
+    !map.getLayer("nvdb-roadnet-too-narrow") ||
+    !map.getLayer("nvdb-roadnet-too-low")
+  ) {
     return;
   }
 
-  if (!Number.isFinite(vehicleWidthMeters)) {
+  const visible = ["all"];
+
+  if (Number.isFinite(vehicleWidthMeters)) {
+    visible.push(["has", "widthM"]);
+    if (hideTooNarrowRoads) {
+      visible.push([">=", ["get", "widthM"], vehicleWidthMeters]);
+    }
+  }
+
+  if (Number.isFinite(vehicleHeightMeters)) {
+    if (hideTooLowRoads) {
+      visible.push([
+        "any",
+        ["!", ["has", "clearanceM"]],
+        [">=", ["get", "clearanceM"], vehicleHeightMeters]
+      ]);
+    }
+  }
+
+  const visibleFilter = visible.length > 1 ? visible : null;
+  map.setFilter("nvdb-roadnet-line", visibleFilter);
+
+  if (!Number.isFinite(vehicleWidthMeters) || hideTooNarrowRoads) {
     map.setFilter("nvdb-roadnet-too-narrow", ["all", ["has", "widthM"], ["<", ["get", "widthM"], 0]]);
-    map.setFilter("nvdb-roadnet-line", null);
-    return;
+  } else {
+    map.setFilter("nvdb-roadnet-too-narrow", [
+      "all",
+      ...(visibleFilter ? visibleFilter.slice(1) : []),
+      ["<", ["get", "widthM"], vehicleWidthMeters]
+    ]);
   }
 
-  map.setFilter("nvdb-roadnet-too-narrow", [
-    "all",
-    ["has", "widthM"],
-    ["<", ["get", "widthM"], vehicleWidthMeters]
-  ]);
-
-  if (hideTooNarrowRoads) {
-    map.setFilter("nvdb-roadnet-line", ["all", ["has", "widthM"], [">=", ["get", "widthM"], vehicleWidthMeters]]);
+  if (!Number.isFinite(vehicleHeightMeters) || hideTooLowRoads) {
+    map.setFilter("nvdb-roadnet-too-low", ["all", ["has", "clearanceM"], ["<", ["get", "clearanceM"], 0]]);
   } else {
-    map.setFilter("nvdb-roadnet-line", ["has", "widthM"]);
+    map.setFilter("nvdb-roadnet-too-low", [
+      "all",
+      ...(visibleFilter ? visibleFilter.slice(1) : []),
+      ["has", "clearanceM"],
+      ["<", ["get", "clearanceM"], vehicleHeightMeters]
+    ]);
   }
 }
 
@@ -611,6 +744,9 @@ async function refreshNvdbData() {
     if (width) {
       attachWidthToRoadnet(roadnetResult, width);
     }
+    if (height) {
+      attachHeightToRoadnet(roadnetResult, height);
+    }
     map.getSource("nvdb-roadnet").setData(roadnetResult);
     updateVehicleWidthFilters();
   }
@@ -646,7 +782,12 @@ const toggleWidth = document.getElementById("toggle-width");
 const toggleWeight = document.getElementById("toggle-weight");
 const loadSupabase = document.getElementById("load-supabase");
 const vehicleWidthInput = document.getElementById("vehicle-width");
+const vehicleHeightInput = document.getElementById("vehicle-height");
 const hideTooNarrowToggle = document.getElementById("toggle-hide-too-narrow");
+const hideTooLowToggle = document.getElementById("toggle-hide-too-low");
+
+hideTooNarrowRoads = Boolean(hideTooNarrowToggle?.checked);
+hideTooLowRoads = Boolean(hideTooLowToggle?.checked);
 
 toggleElveg.addEventListener("change", (event) => {
   const visibility = event.target.checked ? "visible" : "none";
@@ -662,6 +803,9 @@ toggleRoadnet.addEventListener("change", (event) => {
   }
   if (map.getLayer("nvdb-roadnet-too-narrow")) {
     map.setLayoutProperty("nvdb-roadnet-too-narrow", "visibility", visibility);
+  }
+  if (map.getLayer("nvdb-roadnet-too-low")) {
+    map.setLayoutProperty("nvdb-roadnet-too-low", "visibility", visibility);
   }
 });
 
@@ -700,7 +844,18 @@ vehicleWidthInput?.addEventListener("input", (event) => {
   updateVehicleWidthFilters();
 });
 
+vehicleHeightInput?.addEventListener("input", (event) => {
+  const value = normalizeNumber(event.target.value);
+  vehicleHeightMeters = Number.isFinite(value) ? value : null;
+  updateVehicleWidthFilters();
+});
+
 hideTooNarrowToggle?.addEventListener("change", (event) => {
   hideTooNarrowRoads = Boolean(event.target.checked);
+  updateVehicleWidthFilters();
+});
+
+hideTooLowToggle?.addEventListener("change", (event) => {
+  hideTooLowRoads = Boolean(event.target.checked);
   updateVehicleWidthFilters();
 });
