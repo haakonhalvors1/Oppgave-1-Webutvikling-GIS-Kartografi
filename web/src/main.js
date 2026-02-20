@@ -63,7 +63,6 @@ root.innerHTML = `
         </label>
       </div>
       <p class="note">Zoom inn for å laste mer detaljerte NVDB-data.</p>
-      <p class="note" id="nvdb-status">NVDB: venter...</p>
     </section>
 
     <section>
@@ -439,13 +438,9 @@ function updateVehicleWidthFilters() {
   ]);
 
   if (hideTooNarrowRoads) {
-    map.setFilter("nvdb-roadnet-line", [
-      "any",
-      ["!", ["has", "widthM"]],
-      [">=", ["get", "widthM"], vehicleWidthMeters]
-    ]);
+    map.setFilter("nvdb-roadnet-line", ["all", ["has", "widthM"], [">=", ["get", "widthM"], vehicleWidthMeters]]);
   } else {
-    map.setFilter("nvdb-roadnet-line", null);
+    map.setFilter("nvdb-roadnet-line", ["has", "widthM"]);
   }
 }
 
@@ -584,25 +579,17 @@ async function fetchNvdbWeight(bbox, requestId) {
 }
 
 async function refreshNvdbData() {
-  const statusEl = document.getElementById("nvdb-status");
   if (map.getZoom() < config.nvdb.minZoom) {
     map.getSource("nvdb-roadnet").setData({ type: "FeatureCollection", features: [] });
     map.getSource("nvdb-height").setData({ type: "FeatureCollection", features: [] });
     map.getSource("nvdb-width").setData({ type: "FeatureCollection", features: [] });
     map.getSource("nvdb-weight").setData({ type: "FeatureCollection", features: [] });
-    if (statusEl) {
-      statusEl.textContent = "NVDB: zoom inn for data.";
-    }
     return;
   }
 
   nvdbRequestId += 1;
   const requestId = nvdbRequestId;
   const bbox = getBoundsBbox();
-
-  if (statusEl) {
-    statusEl.textContent = "NVDB: laster...";
-  }
 
   let width = null;
   let roadnetResult = null;
@@ -617,9 +604,6 @@ async function refreshNvdbData() {
     ]);
   } catch (error) {
     console.error("NVDB fetch feil", error);
-    if (statusEl) {
-      statusEl.textContent = "NVDB: feil ved henting (se konsoll).";
-    }
     return;
   }
 
@@ -640,9 +624,6 @@ async function refreshNvdbData() {
     map.getSource("nvdb-weight").setData(weight);
   }
 
-  if (statusEl) {
-    statusEl.textContent = `NVDB: vegnett ${roadnetResult?.features?.length ?? 0}, høyde ${height?.features?.length ?? 0}, bredde ${width?.features?.length ?? 0}, vekt ${weight?.features?.length ?? 0}.`;
-  }
 }
 
 function scheduleNvdbFetch() {
