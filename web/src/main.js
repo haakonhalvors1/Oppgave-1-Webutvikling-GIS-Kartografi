@@ -30,6 +30,27 @@ root.innerHTML = `
     <p>Vegnett og restriksjoner lastes dynamisk fra NVDB basert på kartutsnitt.</p>
 
     <section>
+      <h3>Kjøretøybredde</h3>
+      <div class="layer-list">
+        <label class="control-row">
+          <span class="control-label">Bredde (m)</span>
+          <input type="number" id="vehicle-width" min="0" step="0.1" placeholder="F.eks. 2.6" />
+        </label>
+        <label class="control-row">
+          <span class="control-label">Høyde (m)</span>
+          <input type="number" id="vehicle-height" min="0" step="0.1" placeholder="F.eks. 4.2" />
+        </label>
+        <label class="control-row">
+          <input type="checkbox" id="toggle-hide-too-narrow" /> Skjul veier som er for smale
+        </label>
+        <label class="control-row">
+          <input type="checkbox" id="toggle-hide-too-low" /> Skjul veier med for lav høyde
+        </label>
+      </div>
+      <p class="note">Krever NVDB vegbredde (objekt 838) og høydebegrensning (objekt 591). Ukjent verdi vises fortsatt.</p>
+    </section>
+
+    <section>
       <h3>Lagstyring</h3>
       <div class="layer-list">
         <label class="control-row">
@@ -49,7 +70,6 @@ root.innerHTML = `
         </label>
       </div>
       <p class="note">Zoom inn for å laste mer detaljerte NVDB-data.</p>
-      <p class="note" id="nvdb-status">NVDB: venter...</p>
     </section>
 
     <section>
@@ -93,6 +113,12 @@ map.on("load", () => {
 
 let nvdbFetchTimer;
 let nvdbRequestId = 0;
+
+let vehicleWidthMeters = null;
+let hideTooNarrowRoads = false;
+
+let vehicleHeightMeters = null;
+let hideTooLowRoads = false;
 
 function addElvegLayer() {
   const wmsTileUrl = `${config.elveg.wmsUrl}?SERVICE=WMS&REQUEST=GetMap&VERSION=1.3.0&LAYERS=${config.elveg.layer}&STYLES=&FORMAT=image/png&TRANSPARENT=true&CRS=EPSG:3857&BBOX={bbox-epsg-3857}&WIDTH=256&HEIGHT=256`;
@@ -140,17 +166,97 @@ function addNvdbRoadnetLayer() {
     }
   });
 
-  map.on("click", "nvdb-roadnet-line", (event) => {
+  map.addLayer({
+    id: "nvdb-roadnet-too-narrow",
+    type: "line",
+    source: "nvdb-roadnet",
+    layout: {
+      visibility: "none"
+    },
+    filter: ["all", ["has", "widthM"], ["<", ["get", "widthM"], 0]],
+    paint: {
+      "line-width": [
+        "match",
+        ["get", "typeVeg"],
+        "Motorveg",
+        6,
+        "Enkel bilveg",
+        4,
+        3
+      ],
+      "line-color": "#dc2626",
+      "line-opacity": 0.9
+    }
+  });
+
+  map.addLayer({
+    id: "nvdb-roadnet-too-low",
+    type: "line",
+    source: "nvdb-roadnet",
+    layout: {
+      visibility: "none"
+    },
+    filter: ["all", ["has", "clearanceM"], ["<", ["get", "clearanceM"], 0]],
+    paint: {
+      "line-width": [
+        "match",
+        ["get", "typeVeg"],
+        "Motorveg",
+        6,
+        "Enkel bilveg",
+        4,
+        3
+      ],
+      "line-color": "#ef4444",
+      "line-opacity": 0.9
+    }
+  });
+
+  const handleRoadnetClick = (event) => {
     const feature = event.features?.[0];
     if (!feature) return;
-    const { typeVeg, veglenkesekvensid } = feature.properties;
+    const { typeVeg, veglenkesekvensid, widthText, widthM, clearanceText, clearanceM } =
+      feature.properties;
+
+    const vehicleWidthText = Number.isFinite(vehicleWidthMeters)
+      ? `${vehicleWidthMeters.toFixed(1)} m`
+      : null;
+    const roadWidthNumber = typeof widthM === "number" ? widthM : Number(widthM);
+    const passable =
+      Number.isFinite(vehicleWidthMeters) && Number.isFinite(roadWidthNumber)
+        ? roadWidthNumber >= vehicleWidthMeters
+        : null;
+
+    const vehicleHeightText = Number.isFinite(vehicleHeightMeters)
+      ? `${vehicleHeightMeters.toFixed(1)} m`
+      : null;
+    const roadClearanceNumber =
+      typeof clearanceM === "number" ? clearanceM : Number(clearanceM);
+    const passableHeight =
+      Number.isFinite(vehicleHeightMeters) && Number.isFinite(roadClearanceNumber)
+        ? roadClearanceNumber >= vehicleHeightMeters
+        : null;
+
     new maplibregl.Popup()
       .setLngLat(event.lngLat)
       .setHTML(
-        `<strong>Vegnett</strong><br/>Type: ${typeVeg || "Ukjent"}<br/>Veglenkesekvens: ${veglenkesekvensid || "?"}`
+        `<strong>Vegnett</strong><br/>Type: ${typeVeg || "Ukjent"}<br/>Veglenkesekvens: ${veglenkesekvensid || "?"}` +
+          `<br/>Vegbredde (NVDB): ${widthText || "Ukjent"}` +
+          `<br/>Høydebegrensning (NVDB): ${clearanceText || "Ukjent"}` +
+          (vehicleWidthText
+            ? `<br/>Kjøretøy: ${vehicleWidthText} → ${passable === null ? "ukjent" : passable ? "OK" : "FOR SMAL"}`
+            : "")
+          +
+          (vehicleHeightText
+            ? `<br/>Kjøretøyhøyde: ${vehicleHeightText} → ${passableHeight === null ? "ukjent" : passableHeight ? "OK" : "FOR LAV"}`
+            : "")
       )
       .addTo(map);
-  });
+  };
+
+  map.on("click", "nvdb-roadnet-line", handleRoadnetClick);
+  map.on("click", "nvdb-roadnet-too-narrow", handleRoadnetClick);
+  map.on("click", "nvdb-roadnet-too-low", handleRoadnetClick);
 }
 
 function addNvdbHeightLayer() {
@@ -256,6 +362,219 @@ function parseLineString(wkt) {
     return [Number(parts[1]), Number(parts[0])];
   });
   return coords.length ? coords : null;
+}
+
+function normalizeNumber(value) {
+  if (value === null || value === undefined) return null;
+  if (typeof value === "number") return Number.isFinite(value) ? value : null;
+  const text = String(value).trim();
+  if (!text) return null;
+  const normalized = text.replace(/\s/g, "").replace(",", ".");
+  const parsed = Number(normalized);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+function haversineMeters(aLngLat, bLngLat) {
+  const [lon1, lat1] = aLngLat;
+  const [lon2, lat2] = bLngLat;
+  if (![lon1, lat1, lon2, lat2].every((n) => Number.isFinite(n))) return Infinity;
+
+  const R = 6371000;
+  const toRad = (deg) => (deg * Math.PI) / 180;
+  const dLat = toRad(lat2 - lat1);
+  const dLon = toRad(lon2 - lon1);
+  const phi1 = toRad(lat1);
+  const phi2 = toRad(lat2);
+
+  const sinDLat = Math.sin(dLat / 2);
+  const sinDLon = Math.sin(dLon / 2);
+  const h = sinDLat * sinDLat + Math.cos(phi1) * Math.cos(phi2) * sinDLon * sinDLon;
+  return 2 * R * Math.asin(Math.min(1, Math.sqrt(h)));
+}
+
+function lineMidpoint(coords) {
+  if (!Array.isArray(coords) || coords.length === 0) return null;
+  return coords[Math.floor(coords.length / 2)] ?? null;
+}
+
+function buildSpatialIndex(points, cellSizeDegrees) {
+  const index = new Map();
+  const cellKey = (lon, lat) => {
+    const x = Math.floor(lon / cellSizeDegrees);
+    const y = Math.floor(lat / cellSizeDegrees);
+    return `${x}:${y}`;
+  };
+
+  for (const point of points) {
+    const [lon, lat] = point.mid;
+    const key = cellKey(lon, lat);
+    const bucket = index.get(key);
+    if (bucket) bucket.push(point);
+    else index.set(key, [point]);
+  }
+
+  return { index, cellKey };
+}
+
+function attachWidthToRoadnet(roadnet, widthLayer) {
+  if (!roadnet?.features?.length || !widthLayer?.features?.length) return;
+
+  const widthPoints = [];
+  for (const feature of widthLayer.features) {
+    const coords = feature?.geometry?.coordinates;
+    const mid = lineMidpoint(coords);
+    if (!mid) continue;
+    const widthM = normalizeNumber(feature?.properties?.widthValue);
+    if (!Number.isFinite(widthM)) continue;
+    widthPoints.push({ mid, widthM });
+  }
+
+  if (!widthPoints.length) return;
+
+  const cellSizeDegrees = 0.01;
+  const { index, cellKey } = buildSpatialIndex(widthPoints, cellSizeDegrees);
+  const maxMatchMeters = 75;
+
+  for (const feature of roadnet.features) {
+    const coords = feature?.geometry?.coordinates;
+    const mid = lineMidpoint(coords);
+    if (!mid) continue;
+
+    const [lon, lat] = mid;
+    const baseKey = cellKey(lon, lat);
+    const [baseXText, baseYText] = baseKey.split(":");
+    const baseX = Number(baseXText);
+    const baseY = Number(baseYText);
+
+    let best = null;
+    for (let dx = -1; dx <= 1; dx += 1) {
+      for (let dy = -1; dy <= 1; dy += 1) {
+        const key = `${baseX + dx}:${baseY + dy}`;
+        const bucket = index.get(key);
+        if (!bucket) continue;
+        for (const candidate of bucket) {
+          const dist = haversineMeters(mid, candidate.mid);
+          if (dist > maxMatchMeters) continue;
+          if (!best || dist < best.dist) {
+            best = { dist, widthM: candidate.widthM };
+          }
+        }
+      }
+    }
+
+    if (best) {
+      feature.properties = feature.properties || {};
+      feature.properties.widthM = best.widthM;
+      feature.properties.widthText = `${best.widthM.toFixed(1)} m`;
+    }
+  }
+}
+
+function attachHeightToRoadnet(roadnet, heightLayer) {
+  if (!roadnet?.features?.length || !heightLayer?.features?.length) return;
+
+  const heightPoints = [];
+  for (const feature of heightLayer.features) {
+    const coords = feature?.geometry?.coordinates;
+    const mid = lineMidpoint(coords);
+    if (!mid) continue;
+    const clearanceM = normalizeNumber(feature?.properties?.height);
+    if (!Number.isFinite(clearanceM)) continue;
+    heightPoints.push({ mid, clearanceM });
+  }
+
+  if (!heightPoints.length) return;
+
+  const cellSizeDegrees = 0.01;
+  const { index, cellKey } = buildSpatialIndex(heightPoints, cellSizeDegrees);
+  const maxMatchMeters = 75;
+
+  for (const feature of roadnet.features) {
+    const coords = feature?.geometry?.coordinates;
+    const mid = lineMidpoint(coords);
+    if (!mid) continue;
+
+    const [lon, lat] = mid;
+    const baseKey = cellKey(lon, lat);
+    const [baseXText, baseYText] = baseKey.split(":");
+    const baseX = Number(baseXText);
+    const baseY = Number(baseYText);
+
+    let best = null;
+    for (let dx = -1; dx <= 1; dx += 1) {
+      for (let dy = -1; dy <= 1; dy += 1) {
+        const key = `${baseX + dx}:${baseY + dy}`;
+        const bucket = index.get(key);
+        if (!bucket) continue;
+        for (const candidate of bucket) {
+          const dist = haversineMeters(mid, candidate.mid);
+          if (dist > maxMatchMeters) continue;
+          if (!best || dist < best.dist) {
+            best = { dist, clearanceM: candidate.clearanceM };
+          }
+        }
+      }
+    }
+
+    if (best) {
+      feature.properties = feature.properties || {};
+      feature.properties.clearanceM = best.clearanceM;
+      feature.properties.clearanceText = `${best.clearanceM.toFixed(1)} m`;
+    }
+  }
+}
+
+function updateVehicleWidthFilters() {
+  if (
+    !map.getLayer("nvdb-roadnet-line") ||
+    !map.getLayer("nvdb-roadnet-too-narrow") ||
+    !map.getLayer("nvdb-roadnet-too-low")
+  ) {
+    return;
+  }
+
+  const visible = ["all"];
+
+  if (Number.isFinite(vehicleWidthMeters)) {
+    visible.push(["has", "widthM"]);
+    if (hideTooNarrowRoads) {
+      visible.push([">=", ["get", "widthM"], vehicleWidthMeters]);
+    }
+  }
+
+  if (Number.isFinite(vehicleHeightMeters)) {
+    if (hideTooLowRoads) {
+      visible.push([
+        "any",
+        ["!", ["has", "clearanceM"]],
+        [">=", ["get", "clearanceM"], vehicleHeightMeters]
+      ]);
+    }
+  }
+
+  const visibleFilter = visible.length > 1 ? visible : null;
+  map.setFilter("nvdb-roadnet-line", visibleFilter);
+
+  if (!Number.isFinite(vehicleWidthMeters) || hideTooNarrowRoads) {
+    map.setFilter("nvdb-roadnet-too-narrow", ["all", ["has", "widthM"], ["<", ["get", "widthM"], 0]]);
+  } else {
+    map.setFilter("nvdb-roadnet-too-narrow", [
+      "all",
+      ...(visibleFilter ? visibleFilter.slice(1) : []),
+      ["<", ["get", "widthM"], vehicleWidthMeters]
+    ]);
+  }
+
+  if (!Number.isFinite(vehicleHeightMeters) || hideTooLowRoads) {
+    map.setFilter("nvdb-roadnet-too-low", ["all", ["has", "clearanceM"], ["<", ["get", "clearanceM"], 0]]);
+  } else {
+    map.setFilter("nvdb-roadnet-too-low", [
+      "all",
+      ...(visibleFilter ? visibleFilter.slice(1) : []),
+      ["has", "clearanceM"],
+      ["<", ["get", "clearanceM"], vehicleHeightMeters]
+    ]);
+  }
 }
 
 function getBoundsBbox() {
@@ -393,25 +712,17 @@ async function fetchNvdbWeight(bbox, requestId) {
 }
 
 async function refreshNvdbData() {
-  const statusEl = document.getElementById("nvdb-status");
   if (map.getZoom() < config.nvdb.minZoom) {
     map.getSource("nvdb-roadnet").setData({ type: "FeatureCollection", features: [] });
     map.getSource("nvdb-height").setData({ type: "FeatureCollection", features: [] });
     map.getSource("nvdb-width").setData({ type: "FeatureCollection", features: [] });
     map.getSource("nvdb-weight").setData({ type: "FeatureCollection", features: [] });
-    if (statusEl) {
-      statusEl.textContent = "NVDB: zoom inn for data.";
-    }
     return;
   }
 
   nvdbRequestId += 1;
   const requestId = nvdbRequestId;
   const bbox = getBoundsBbox();
-
-  if (statusEl) {
-    statusEl.textContent = "NVDB: laster...";
-  }
 
   let width = null;
   let roadnetResult = null;
@@ -426,14 +737,18 @@ async function refreshNvdbData() {
     ]);
   } catch (error) {
     console.error("NVDB fetch feil", error);
-    if (statusEl) {
-      statusEl.textContent = "NVDB: feil ved henting (se konsoll).";
-    }
     return;
   }
 
   if (roadnetResult) {
+    if (width) {
+      attachWidthToRoadnet(roadnetResult, width);
+    }
+    if (height) {
+      attachHeightToRoadnet(roadnetResult, height);
+    }
     map.getSource("nvdb-roadnet").setData(roadnetResult);
+    updateVehicleWidthFilters();
   }
   if (height) {
     map.getSource("nvdb-height").setData(height);
@@ -445,9 +760,6 @@ async function refreshNvdbData() {
     map.getSource("nvdb-weight").setData(weight);
   }
 
-  if (statusEl) {
-    statusEl.textContent = `NVDB: vegnett ${roadnetResult?.features?.length ?? 0}, høyde ${height?.features?.length ?? 0}, bredde ${width?.features?.length ?? 0}, vekt ${weight?.features?.length ?? 0}.`;
-  }
 }
 
 function scheduleNvdbFetch() {
@@ -469,6 +781,13 @@ const toggleHeight = document.getElementById("toggle-height");
 const toggleWidth = document.getElementById("toggle-width");
 const toggleWeight = document.getElementById("toggle-weight");
 const loadSupabase = document.getElementById("load-supabase");
+const vehicleWidthInput = document.getElementById("vehicle-width");
+const vehicleHeightInput = document.getElementById("vehicle-height");
+const hideTooNarrowToggle = document.getElementById("toggle-hide-too-narrow");
+const hideTooLowToggle = document.getElementById("toggle-hide-too-low");
+
+hideTooNarrowRoads = Boolean(hideTooNarrowToggle?.checked);
+hideTooLowRoads = Boolean(hideTooLowToggle?.checked);
 
 toggleElveg.addEventListener("change", (event) => {
   const visibility = event.target.checked ? "visible" : "none";
@@ -481,6 +800,12 @@ toggleRoadnet.addEventListener("change", (event) => {
   const visibility = event.target.checked ? "visible" : "none";
   if (map.getLayer("nvdb-roadnet-line")) {
     map.setLayoutProperty("nvdb-roadnet-line", "visibility", visibility);
+  }
+  if (map.getLayer("nvdb-roadnet-too-narrow")) {
+    map.setLayoutProperty("nvdb-roadnet-too-narrow", "visibility", visibility);
+  }
+  if (map.getLayer("nvdb-roadnet-too-low")) {
+    map.setLayoutProperty("nvdb-roadnet-too-low", "visibility", visibility);
   }
 });
 
@@ -511,4 +836,26 @@ if (config.supabase.url && config.supabase.key) {
 
 loadSupabase.addEventListener("click", () => {
   alert("Supabase-henting ikke implementert ennå. Koble Supabase JS og legg til en kilde.");
+});
+
+vehicleWidthInput?.addEventListener("input", (event) => {
+  const value = normalizeNumber(event.target.value);
+  vehicleWidthMeters = Number.isFinite(value) ? value : null;
+  updateVehicleWidthFilters();
+});
+
+vehicleHeightInput?.addEventListener("input", (event) => {
+  const value = normalizeNumber(event.target.value);
+  vehicleHeightMeters = Number.isFinite(value) ? value : null;
+  updateVehicleWidthFilters();
+});
+
+hideTooNarrowToggle?.addEventListener("change", (event) => {
+  hideTooNarrowRoads = Boolean(event.target.checked);
+  updateVehicleWidthFilters();
+});
+
+hideTooLowToggle?.addEventListener("change", (event) => {
+  hideTooLowRoads = Boolean(event.target.checked);
+  updateVehicleWidthFilters();
 });

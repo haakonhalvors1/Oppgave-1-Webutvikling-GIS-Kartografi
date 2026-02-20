@@ -55,6 +55,19 @@ body {
   margin-bottom: 8px;
 }
 
+.control-label {
+  min-width: 82px;
+  color: #334155;
+}
+
+.control-row input[type="number"] {
+  flex: 1;
+  padding: 8px 10px;
+  border: 1px solid #cbd5e1;
+  border-radius: 10px;
+  background: #ffffff;
+}
+
 button {
   padding: 10px 14px;
   border: none;
