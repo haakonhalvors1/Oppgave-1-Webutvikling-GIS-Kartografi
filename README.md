@@ -202,10 +202,16 @@ Oppgave-1-Webutvikling-GIS-Kartografi/
 
 ## Refleksjon
 
-### Hva fungerer godt?
-- **Dynamisk datalasting**: Kartutsnitt-basert henting fra NVDB sikrer at man alltid får relevant data uten å laste ned hele Norge. Debouncing (350ms) gir god responsivitet uten å spamme API-et.
-- **Spatial matching**: Algoritmen for å koble vegbredde til veglenker fungerer overraskende bra med 35-meters radius. Dette kompenserer for at punkter ikke ligger eksakt på samme koordinat.
-- **Retningsanalyse**: Bearing-beregning og kjørefeltsanalyse (partall mot, oddetall med retning) gir verdifull kontekst for vegplanlegging.
+Hva fungerer godt?
+
+Dynamisk datalasting
+Data hentes basert på gjeldende kartutsnitt, slik at bare relevante objekter lastes inn. Dette reduserer mengden data som behandles og gir bedre ytelse enn å hente hele datasettet. Debouncing på 350 ms begrenser antall API-kall ved panorering og zooming, og hindrer unødvendig belastning på tjenesten.
+
+Kobling av vegbredde og veglenker
+Metoden for å knytte vegbredde-punkter til riktige veglenker fungerer stabilt. En radius på 35 meter gir som regel riktig treff, selv når objektene ikke ligger helt presist på samme koordinat. Dette håndterer mindre avvik i datagrunnlaget uten at det gir mange feiltilkoblinger.
+
+Retningsanalyse
+Bearing-beregninger brukes for å fastsette retningen på veglenker. Kjørefelt analyseres basert på nummerering, der partall går mot retning og oddetall med retning. Dette gir et bedre grunnlag for å forstå trafikkretning og struktur i vegnettet.
 
 ### Forbedringspunkter
 1. **Ytelse ved store datasett**: Ved zoom-nivå 10-12 i tettbygde områder kan 300 features være for mye. Skulle implementert clustering eller tile-basert vektordata (PMTiles/MVT).
