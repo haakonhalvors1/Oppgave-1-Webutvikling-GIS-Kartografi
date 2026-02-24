@@ -8,7 +8,8 @@
 Dette kartet løser problemet med å identifisere kjørbare veier for store kjøretøy ved å visualisere vegbredde, høydebegrensninger og bruksklasser dynamisk fra NVDB. Brukeren kan angi kjøretøyets bredde og filtrere bort veier som er for smale, samt se detaljert informasjon om veglenker inkludert kjøreretning og antall kjørefelt. Kartet henter data i sanntid basert på kartutsnitt, slik at man alltid får oppdatert informasjon om vegnettet i det valgte området.
 
 ## Demo av system
-*Merk: Video/GIF av systemet vil legges til her*
+
+https://github.com/haakonhalvors1/Oppgave-1-Webutvikling-GIS-Kartografi/assets/GIS%20Oppgave%201%20Demo.mp4
 
 ### Funksjonalitet
 - Dynamisk lasting av vegnett fra NVDB basert på kartutsnitt
