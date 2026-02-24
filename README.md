@@ -9,7 +9,7 @@ Dette kartet løser problemet med å identifisere kjørbare veier for store kjø
 
 ## Demo av system
 
-https://github.com/haakonhalvors1/Oppgave-1-Webutvikling-GIS-Kartografi/assets/GIS%20Oppgave%201%20Demo.mp4
+[https://github.com/haakonhalvors1/Oppgave-1-Webutvikling-GIS-Kartografi/assets/GIS%20Oppgave%201%20Demo.mp4](https://drive.google.com/file/d/1GB37qL-jWexJBuJD9KxtC86a5BB9RWg8/view?usp=sharing)
 
 ### Funksjonalitet
 - Dynamisk lasting av vegnett fra NVDB basert på kartutsnitt
