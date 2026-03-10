@@ -2,6 +2,25 @@ import maplibregl from "maplibre-gl";
 import { createClient } from "@supabase/supabase-js";
 import "./style.css";
 
+const TEAM_SUPABASE_URL = "https://zdegeuncqvgqzjszwtqc.supabase.co";
+const TEAM_SUPABASE_ANON_KEY =
+  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InpkZWdldW5jcXZncXpqc3p3dHFjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzAxMjA2NjUsImV4cCI6MjA4NTY5NjY2NX0.UZJzfZnPwhMr7Z3cCgj_5_DJsz9KdTtFFgXBq6uSOSo";
+
+const envSupabaseUrl = (import.meta.env.VITE_SUPABASE_URL || "").trim();
+const envSupabaseKey = (
+  import.meta.env.VITE_SUPABASE_KEY || import.meta.env.VITE_SUPABASE_ANON_KEY || ""
+).trim();
+
+const resolvedSupabaseUrl =
+  envSupabaseUrl && !envSupabaseUrl.includes("your-supabase-url")
+    ? envSupabaseUrl
+    : TEAM_SUPABASE_URL;
+
+const resolvedSupabaseKey =
+  envSupabaseKey && envSupabaseKey !== "public-anon-key" && envSupabaseKey !== "your-anon-public-key"
+    ? envSupabaseKey
+    : TEAM_SUPABASE_ANON_KEY;
+
 const config = {
   baseStyle: "https://basemaps.cartocdn.com/gl/positron-gl-style/style.json",
   elveg: {
@@ -18,8 +37,8 @@ const config = {
     minZoom: 10
   },
   supabase: {
-    url: import.meta.env.VITE_SUPABASE_URL,
-    key: import.meta.env.VITE_SUPABASE_KEY || import.meta.env.VITE_SUPABASE_ANON_KEY
+    url: resolvedSupabaseUrl,
+    key: resolvedSupabaseKey
   }
 };
 
