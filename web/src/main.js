@@ -19,7 +19,7 @@ const config = {
   },
   supabase: {
     url: import.meta.env.VITE_SUPABASE_URL,
-    key: import.meta.env.VITE_SUPABASE_KEY
+    key: import.meta.env.VITE_SUPABASE_KEY || import.meta.env.VITE_SUPABASE_ANON_KEY
   }
 };
 
@@ -847,6 +847,11 @@ if (config.supabase.url && config.supabase.key) {
   loadSupabase.disabled = false;
   const statusEl = document.getElementById("supabase-status");
   if (statusEl) statusEl.textContent = "Klar til å laste data";
+} else {
+  const statusEl = document.getElementById("supabase-status");
+  if (statusEl) {
+    statusEl.textContent = "Mangler Supabase-konfigurasjon. Kopier web/.env.example til web/.env";
+  }
 }
 
 loadSupabase.addEventListener("click", async () => {
