@@ -166,6 +166,9 @@ cd web
 # Installer avhengigheter
 npm install
 
+# Opprett lokal miljøfil for Supabase (hvis du skal bruke Supabase-funksjoner)
+cp .env.example .env
+
 # Start utviklingsserver
 npm run dev
 

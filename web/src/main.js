@@ -1,5 +1,25 @@
 import maplibregl from "maplibre-gl";
+import { createClient } from "@supabase/supabase-js";
 import "./style.css";
+
+const TEAM_SUPABASE_URL = "https://zdegeuncqvgqzjszwtqc.supabase.co";
+const TEAM_SUPABASE_ANON_KEY =
+  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InpkZWdldW5jcXZncXpqc3p3dHFjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzAxMjA2NjUsImV4cCI6MjA4NTY5NjY2NX0.UZJzfZnPwhMr7Z3cCgj_5_DJsz9KdTtFFgXBq6uSOSo";
+
+const envSupabaseUrl = (import.meta.env.VITE_SUPABASE_URL || "").trim();
+const envSupabaseKey = (
+  import.meta.env.VITE_SUPABASE_KEY || import.meta.env.VITE_SUPABASE_ANON_KEY || ""
+).trim();
+
+const resolvedSupabaseUrl =
+  envSupabaseUrl && !envSupabaseUrl.includes("your-supabase-url")
+    ? envSupabaseUrl
+    : TEAM_SUPABASE_URL;
+
+const resolvedSupabaseKey =
+  envSupabaseKey && envSupabaseKey !== "public-anon-key" && envSupabaseKey !== "your-anon-public-key"
+    ? envSupabaseKey
+    : TEAM_SUPABASE_ANON_KEY;
 
 const config = {
   baseStyle: "https://basemaps.cartocdn.com/gl/positron-gl-style/style.json",
@@ -17,10 +37,14 @@ const config = {
     minZoom: 10
   },
   supabase: {
-    url: import.meta.env.VITE_SUPABASE_URL,
-    key: import.meta.env.VITE_SUPABASE_KEY
+    url: resolvedSupabaseUrl,
+    key: resolvedSupabaseKey
   }
 };
+
+const supabase = config.supabase.url && config.supabase.key 
+  ? createClient(config.supabase.url, config.supabase.key)
+  : null;
 
 const root = document.getElementById("app");
 root.innerHTML = `
@@ -85,9 +109,14 @@ root.innerHTML = `
     </section>
 
     <section>
-      <h3>Supabase (valgfritt)</h3>
-      <button id="load-supabase" disabled>Hent fra Supabase</button>
-      <p class="note">Aktiver ved å sette <code>VITE_SUPABASE_URL</code> og <code>VITE_SUPABASE_KEY</code>.</p>
+      <h3>Supabase Database</h3>
+      <div class="layer-list">
+        <label class="control-row">
+          <input type="checkbox" checked disabled /> Kjøretøydetaljer
+        </label>
+      </div>
+      <button id="load-supabase" disabled>Last data fra Supabase</button>
+      <p class="note" id="supabase-status">Kobler til database...</p>
     </section>
   </aside>
   <main id="map"></main>
@@ -832,10 +861,61 @@ toggleWeight.addEventListener("change", (event) => {
 
 if (config.supabase.url && config.supabase.key) {
   loadSupabase.disabled = false;
+  const statusEl = document.getElementById("supabase-status");
+  if (statusEl) statusEl.textContent = "Klar til å laste data";
+} else {
+  const statusEl = document.getElementById("supabase-status");
+  if (statusEl) {
+    statusEl.textContent = "Mangler Supabase-konfigurasjon. Kopier web/.env.example til web/.env";
+  }
 }
 
-loadSupabase.addEventListener("click", () => {
-  alert("Supabase-henting ikke implementert ennå. Koble Supabase JS og legg til en kilde.");
+loadSupabase.addEventListener("click", async () => {
+  if (!supabase) {
+    alert("Supabase ikke konfigurert. Sjekk .env filen.");
+    return;
+  }
+  
+  const statusEl = document.getElementById("supabase-status");
+  
+  try {
+    // Test tilkoblingen først
+    if (statusEl) statusEl.textContent = "Tester tilkobling...";
+    
+    const tableCandidates = ["Kjoretoy_detaljer", "kjoretoy_detaljer"];
+    let selectedTable = null;
+    let rows = [];
+    let lastError = null;
+
+    for (const tableName of tableCandidates) {
+      const { data, error } = await supabase.from(tableName).select("*").limit(50);
+      if (!error) {
+        selectedTable = tableName;
+        rows = data || [];
+        break;
+      }
+      lastError = error;
+    }
+
+    if (!selectedTable) {
+      throw lastError || new Error("Fant ikke tabellen Kjoretoy_detaljer.");
+    }
+
+    console.log(`Data fra Supabase-tabell ${selectedTable}:`, rows);
+
+    if (statusEl) {
+      statusEl.textContent = `✓ Tilkoblet! ${rows.length} rader fra ${selectedTable}`;
+    }
+
+    alert(
+      `Supabase fungerer!\n\nTabell: ${selectedTable}\nAntall rader hentet: ${rows.length}\n\nSe konsollen for detaljer.`
+    );
+    
+  } catch (err) {
+    console.error('Feil ved henting fra Supabase:', err);
+    if (statusEl) statusEl.textContent = `✗ Feil: ${err.message}`;
+    alert(`Feil ved tilkobling til Supabase:\n${err.message}`);
+  }
 });
 
 vehicleWidthInput?.addEventListener("input", (event) => {

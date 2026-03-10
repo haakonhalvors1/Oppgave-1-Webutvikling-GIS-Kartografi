@@ -3,5 +3,9 @@ dist/
 .DS_Store
 .env
 .env.local
+.env.*
+web/.env
+web/.env.*
+!web/.env.example
 .vscode/
 .cache/
