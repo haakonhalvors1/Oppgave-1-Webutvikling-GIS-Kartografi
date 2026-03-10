@@ -1,4 +1,5 @@
 import maplibregl from "maplibre-gl";
+import { createClient } from "@supabase/supabase-js";
 import "./style.css";
 
 const config = {
@@ -21,6 +22,10 @@ const config = {
     key: import.meta.env.VITE_SUPABASE_KEY
   }
 };
+
+const supabase = config.supabase.url && config.supabase.key 
+  ? createClient(config.supabase.url, config.supabase.key)
+  : null;
 
 const root = document.getElementById("app");
 root.innerHTML = `
@@ -834,8 +839,29 @@ if (config.supabase.url && config.supabase.key) {
   loadSupabase.disabled = false;
 }
 
-loadSupabase.addEventListener("click", () => {
-  alert("Supabase-henting ikke implementert ennå. Koble Supabase JS og legg til en kilde.");
+loadSupabase.addEventListener("click", async () => {
+  if (!supabase) {
+    alert("Supabase ikke konfigurert. Sjekk .env filen.");
+    return;
+  }
+  
+  try {
+    // Eksempel: Hent data fra en tabell kalt 'restrictions'
+    const { data, error } = await supabase
+      .from('restrictions')
+      .select('*');
+    
+    if (error) throw error;
+    
+    console.log('Data hentet fra Supabase:', data);
+    alert(`Hentet ${data?.length || 0} objekter fra Supabase. Se konsollen for detaljer.`);
+    
+    // Legg til som GeoJSON-kilde hvis dataene har geometri
+    // Du kan tilpasse dette basert på din database-struktur
+  } catch (err) {
+    console.error('Feil ved henting fra Supabase:', err);
+    alert(`Feil: ${err.message}`);
+  }
 });
 
 vehicleWidthInput?.addEventListener("input", (event) => {
