@@ -112,10 +112,7 @@ root.innerHTML = `
       <h3>Supabase Database</h3>
       <div class="layer-list">
         <label class="control-row">
-          <input type="checkbox" id="toggle-road-segments" /> Vegsegmenter
-        </label>
-        <label class="control-row">
-          <input type="checkbox" id="toggle-tunnels" /> Tunneler
+          <input type="checkbox" checked disabled /> Kjøretøydetaljer
         </label>
       </div>
       <button id="load-supabase" disabled>Last data fra Supabase</button>
@@ -885,30 +882,34 @@ loadSupabase.addEventListener("click", async () => {
     // Test tilkoblingen først
     if (statusEl) statusEl.textContent = "Tester tilkobling...";
     
-    // Hent data fra road_segments
-    const { data: roadData, error: roadError } = await supabase
-      .from('road_segments')
-      .select('*')
-      .limit(10);
-    
-    if (roadError) throw roadError;
-    
-    // Hent data fra tunnels
-    const { data: tunnelData, error: tunnelError } = await supabase
-      .from('tunnels')
-      .select('*')
-      .limit(10);
-    
-    if (tunnelError) throw tunnelError;
-    
-    console.log('Road segments fra Supabase:', roadData);
-    console.log('Tunnels fra Supabase:', tunnelData);
-    
-    if (statusEl) {
-      statusEl.textContent = `✓ Tilkoblet! ${roadData?.length || 0} vegsegmenter, ${tunnelData?.length || 0} tunneler`;
+    const tableCandidates = ["Kjoretoy_detaljer", "kjoretoy_detaljer"];
+    let selectedTable = null;
+    let rows = [];
+    let lastError = null;
+
+    for (const tableName of tableCandidates) {
+      const { data, error } = await supabase.from(tableName).select("*").limit(50);
+      if (!error) {
+        selectedTable = tableName;
+        rows = data || [];
+        break;
+      }
+      lastError = error;
     }
-    
-    alert(`Supabase fungerer!\n\nVegsegmenter: ${roadData?.length || 0}\nTunneler: ${tunnelData?.length || 0}\n\nSe konsollen for detaljer.`);
+
+    if (!selectedTable) {
+      throw lastError || new Error("Fant ikke tabellen Kjoretoy_detaljer.");
+    }
+
+    console.log(`Data fra Supabase-tabell ${selectedTable}:`, rows);
+
+    if (statusEl) {
+      statusEl.textContent = `✓ Tilkoblet! ${rows.length} rader fra ${selectedTable}`;
+    }
+
+    alert(
+      `Supabase fungerer!\n\nTabell: ${selectedTable}\nAntall rader hentet: ${rows.length}\n\nSe konsollen for detaljer.`
+    );
     
   } catch (err) {
     console.error('Feil ved henting fra Supabase:', err);
