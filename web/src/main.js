@@ -90,9 +90,17 @@ root.innerHTML = `
     </section>
 
     <section>
-      <h3>Supabase (valgfritt)</h3>
-      <button id="load-supabase" disabled>Hent fra Supabase</button>
-      <p class="note">Aktiver ved å sette <code>VITE_SUPABASE_URL</code> og <code>VITE_SUPABASE_KEY</code>.</p>
+      <h3>Supabase Database</h3>
+      <div class="layer-list">
+        <label class="control-row">
+          <input type="checkbox" id="toggle-road-segments" /> Vegsegmenter
+        </label>
+        <label class="control-row">
+          <input type="checkbox" id="toggle-tunnels" /> Tunneler
+        </label>
+      </div>
+      <button id="load-supabase" disabled>Last data fra Supabase</button>
+      <p class="note" id="supabase-status">Kobler til database...</p>
     </section>
   </aside>
   <main id="map"></main>
@@ -837,6 +845,8 @@ toggleWeight.addEventListener("change", (event) => {
 
 if (config.supabase.url && config.supabase.key) {
   loadSupabase.disabled = false;
+  const statusEl = document.getElementById("supabase-status");
+  if (statusEl) statusEl.textContent = "Klar til å laste data";
 }
 
 loadSupabase.addEventListener("click", async () => {
@@ -845,22 +855,41 @@ loadSupabase.addEventListener("click", async () => {
     return;
   }
   
+  const statusEl = document.getElementById("supabase-status");
+  
   try {
-    // Eksempel: Hent data fra en tabell kalt 'restrictions'
-    const { data, error } = await supabase
-      .from('restrictions')
-      .select('*');
+    // Test tilkoblingen først
+    if (statusEl) statusEl.textContent = "Tester tilkobling...";
     
-    if (error) throw error;
+    // Hent data fra road_segments
+    const { data: roadData, error: roadError } = await supabase
+      .from('road_segments')
+      .select('*')
+      .limit(10);
     
-    console.log('Data hentet fra Supabase:', data);
-    alert(`Hentet ${data?.length || 0} objekter fra Supabase. Se konsollen for detaljer.`);
+    if (roadError) throw roadError;
     
-    // Legg til som GeoJSON-kilde hvis dataene har geometri
-    // Du kan tilpasse dette basert på din database-struktur
+    // Hent data fra tunnels
+    const { data: tunnelData, error: tunnelError } = await supabase
+      .from('tunnels')
+      .select('*')
+      .limit(10);
+    
+    if (tunnelError) throw tunnelError;
+    
+    console.log('Road segments fra Supabase:', roadData);
+    console.log('Tunnels fra Supabase:', tunnelData);
+    
+    if (statusEl) {
+      statusEl.textContent = `✓ Tilkoblet! ${roadData?.length || 0} vegsegmenter, ${tunnelData?.length || 0} tunneler`;
+    }
+    
+    alert(`Supabase fungerer!\n\nVegsegmenter: ${roadData?.length || 0}\nTunneler: ${tunnelData?.length || 0}\n\nSe konsollen for detaljer.`);
+    
   } catch (err) {
     console.error('Feil ved henting fra Supabase:', err);
-    alert(`Feil: ${err.message}`);
+    if (statusEl) statusEl.textContent = `✗ Feil: ${err.message}`;
+    alert(`Feil ved tilkobling til Supabase:\n${err.message}`);
   }
 });
 
