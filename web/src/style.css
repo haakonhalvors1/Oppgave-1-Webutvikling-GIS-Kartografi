@@ -7,7 +7,7 @@
 
 html,
 body {
-  background: linear-gradient(120deg, #f3f6ff 0%, #eef2ff 100%);
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
   color: #0f172a;
   min-height: 100vh;
   height: 100%;
@@ -22,23 +22,41 @@ body {
 
 .panel {
   padding: 24px;
-  border-right: 1px solid #e2e8f0;
-  background: #ffffffcc;
+  border-right: 2px solid #667eea;
+  background: linear-gradient(180deg, #ffffff 0%, #f8f9ff 100%);
   backdrop-filter: blur(10px);
+  overflow-y: auto;
+  box-shadow: 2px 0 15px rgba(0, 0, 0, 0.1);
 }
 
 .panel h1 {
-  font-size: 24px;
+  font-size: 26px;
   margin-bottom: 8px;
+  color: #667eea;
+  font-weight: 700;
+}
+
+.panel h3 {
+  color: #764ba2;
+  font-weight: 600;
+  margin-top: 16px;
+  margin-bottom: 12px;
+  border-bottom: 2px solid #667eea;
+  padding-bottom: 8px;
 }
 
 .panel p {
   margin-bottom: 16px;
-  line-height: 1.5;
+  line-height: 1.6;
+  color: #475569;
 }
 
 .panel section {
   margin-bottom: 20px;
+  background: #ffffff;
+  padding: 14px;
+  border-radius: 12px;
+  border: 1px solid #e0e7ff;
 }
 
 .panel label,
@@ -52,39 +70,61 @@ body {
   display: flex;
   align-items: center;
   gap: 8px;
-  margin-bottom: 8px;
+  margin-bottom: 10px;
 }
 
 .control-label {
   min-width: 82px;
-  color: #334155;
+  color: #764ba2;
+  font-weight: 500;
 }
 
 .control-row input[type="number"] {
   flex: 1;
-  padding: 8px 10px;
-  border: 1px solid #cbd5e1;
-  border-radius: 10px;
+  padding: 8px 12px;
+  border: 2px solid #e0e7ff;
+  border-radius: 8px;
+  background: #f8f9ff;
+  transition: border-color 0.2s;
+}
+
+.control-row input[type="number"]:focus {
+  outline: none;
+  border-color: #667eea;
   background: #ffffff;
 }
 
-button {
-  padding: 10px 14px;
-  border: none;
-  border-radius: 10px;
-  background: #111827;
-  color: #fff;
+.control-row input[type="checkbox"] {
   cursor: pointer;
-  transition: transform 0.1s ease, box-shadow 0.2s ease;
+  accent-color: #667eea;
+  width: 18px;
+  height: 18px;
 }
 
-button:hover {
-  transform: translateY(-1px);
-  box-shadow: 0 8px 18px rgba(15, 23, 42, 0.15);
+button {
+  padding: 11px 18px;
+  border: none;
+  border-radius: 8px;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: #fff;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  font-weight: 600;
+  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+}
+
+button:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 20px rgba(102, 126, 234, 0.4);
 }
 
 button:active {
   transform: translateY(0);
+}
+
+button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
 }
 
 #map {
@@ -94,46 +134,55 @@ button:active {
 
 .badge {
   display: inline-block;
-  padding: 4px 10px;
-  background: #e0f2fe;
-  color: #075985;
-  border-radius: 999px;
+  padding: 6px 14px;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: #ffffff;
+  border-radius: 20px;
   font-weight: 600;
   font-size: 12px;
+  box-shadow: 0 2px 8px rgba(102, 126, 234, 0.3);
 }
 
 .layer-list {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 8px;
 }
 
 .note {
   font-size: 12px;
   color: #64748b;
+  background: #f0f4ff;
+  padding: 8px;
+  border-radius: 6px;
+  border-left: 3px solid #667eea;
+  margin-top: 8px;
 }
 
 .legend {
   display: flex;
   flex-direction: column;
-  gap: 8px;
-  margin-top: 8px;
+  gap: 10px;
+  margin-top: 12px;
+  background: #f8f9ff;
+  padding: 12px;
+  border-radius: 8px;
 }
 
 .legend-row {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 10px;
   font-size: 13px;
+  color: #475569;
 }
 
-
-
 .legend-swatch {
-  width: 22px;
-  height: 4px;
+  width: 24px;
+  height: 5px;
   border-radius: 999px;
   display: inline-block;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
 }
 
 .legend-swatch.roadnet {
@@ -156,4 +205,29 @@ button:active {
   background: #f59e0b;
 }
 
+.selected-point-marker {
+  width: 20px;
+  height: 20px;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  border: 3px solid #ffffff;
+  border-radius: 50%;
+  box-shadow: 0 0 10px rgba(102, 126, 234, 0.6), 0 4px 12px rgba(0, 0, 0, 0.2);
+}
 
+.maplibregl-popup-content {
+  background: linear-gradient(135deg, #ffffff 0%, #f8f9ff 100%);
+  border-radius: 10px;
+  border: 2px solid #667eea;
+  padding: 12px;
+  box-shadow: 0 4px 16px rgba(102, 126, 234, 0.2);
+  color: #0f172a;
+  font-size: 13px;
+}
+
+.maplibregl-popup-content strong {
+  color: #764ba2;
+}
+
+.maplibregl-popup-anchor-top .maplibregl-popup-tip {
+  border-top-color: #667eea;
+}

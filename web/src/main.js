@@ -1,6 +1,116 @@
 import maplibregl from "maplibre-gl";
 import { createClient } from "@supabase/supabase-js";
+import proj4 from "proj4";
 import "./style.css";
+
+// ============================================================================
+// COORDINATE SYSTEM CONVERSION: EPSG:25833 (UTM Zone 33) to EPSG:4326 (WGS84)
+// ============================================================================
+
+// Define projections
+proj4.defs('EPSG:25833', '+proj=utm +zone=33 +ellps=GRS80 +units=m +no_defs');
+proj4.defs('EPSG:4326', '+proj=longlat +datum=WGS84 +no_defs');
+
+/**
+ * Convert a single coordinate pair from EPSG:25833 (UTM Zone 33) to EPSG:4326 (WGS84)
+ * @param {number} easting - X coordinate in UTM 33 (meters)
+ * @param {number} northing - Y coordinate in UTM 33 (meters)
+ * @returns {number[]} - [longitude, latitude] in WGS84
+ */
+function convertUTM33toWGS84(easting, northing) {
+  return proj4('EPSG:25833', 'EPSG:4326', [easting, northing]);
+}
+
+/**
+ * Convert a single coordinate pair from EPSG:4326 (WGS84) to EPSG:25833 (UTM Zone 33)
+ * @param {number} longitude - Longitude in WGS84
+ * @param {number} latitude - Latitude in WGS84
+ * @returns {number[]} - [easting, northing] in UTM 33 (meters)
+ */
+function convertWGS84toUTM33(longitude, latitude) {
+  return proj4('EPSG:4326', 'EPSG:25833', [longitude, latitude]);
+}
+
+/**
+ * Convert a GeoJSON feature from EPSG:25833 to EPSG:4326
+ * Handles Point, LineString, Polygon, MultiPoint, MultiLineString, and MultiPolygon
+ * @param {object} geoJsonFeature - GeoJSON feature with geometry in EPSG:25833
+ * @returns {object} - Feature with geometry converted to EPSG:4326
+ */
+function convertGeoJSONfrom25833to4326(geoJsonFeature) {
+  const geom = geoJsonFeature.geometry;
+  
+  function transformCoordinates(coords, depth = 0, targetDepth = 1) {
+    // For Point (depth 0), we have [easting, northing]
+    // For LineString/MultiPoint (depth 1), we have [[e,n], [e,n], ...]
+    // For Polygon/MultiLineString (depth 2), we have [[[e,n], [e,n]], ...]
+    // For MultiPolygon (depth 3), we have [[[[e,n], [e,n]], ...]]
+    
+    if (depth === targetDepth) {
+      return convertUTM33toWGS84(coords[0], coords[1]);
+    }
+    return coords.map(c => transformCoordinates(c, depth + 1, targetDepth));
+  }
+
+  const converted = { ...geoJsonFeature };
+  
+  switch (geom.type) {
+    case 'Point':
+      converted.geometry.coordinates = transformCoordinates(geom.coordinates, 0, 0);
+      break;
+    case 'LineString':
+    case 'MultiPoint':
+      converted.geometry.coordinates = transformCoordinates(geom.coordinates, 0, 1);
+      break;
+    case 'Polygon':
+    case 'MultiLineString':
+      converted.geometry.coordinates = transformCoordinates(geom.coordinates, 0, 2);
+      break;
+    case 'MultiPolygon':
+      converted.geometry.coordinates = transformCoordinates(geom.coordinates, 0, 3);
+      break;
+  }
+  
+  return converted;
+}
+
+/**
+ * Convert a GeoJSON feature from EPSG:4326 to EPSG:25833
+ * Handles all geometry types
+ * @param {object} geoJsonFeature - GeoJSON feature with geometry in EPSG:4326
+ * @returns {object} - Feature with geometry converted to EPSG:25833
+ */
+function convertGeoJSONfrom4326to25833(geoJsonFeature) {
+  const geom = geoJsonFeature.geometry;
+  
+  function transformCoordinates(coords, depth = 0, targetDepth = 1) {
+    if (depth === targetDepth) {
+      return convertWGS84toUTM33(coords[0], coords[1]);
+    }
+    return coords.map(c => transformCoordinates(c, depth + 1, targetDepth));
+  }
+
+  const converted = { ...geoJsonFeature };
+  
+  switch (geom.type) {
+    case 'Point':
+      converted.geometry.coordinates = transformCoordinates(geom.coordinates, 0, 0);
+      break;
+    case 'LineString':
+    case 'MultiPoint':
+      converted.geometry.coordinates = transformCoordinates(geom.coordinates, 0, 1);
+      break;
+    case 'Polygon':
+    case 'MultiLineString':
+      converted.geometry.coordinates = transformCoordinates(geom.coordinates, 0, 2);
+      break;
+    case 'MultiPolygon':
+      converted.geometry.coordinates = transformCoordinates(geom.coordinates, 0, 3);
+      break;
+  }
+  
+  return converted;
+}
 
 const TEAM_SUPABASE_URL = "https://zdegeuncqvgqzjszwtqc.supabase.co";
 const TEAM_SUPABASE_ANON_KEY =
@@ -38,7 +148,17 @@ const config = {
   },
   supabase: {
     url: resolvedSupabaseUrl,
-    key: resolvedSupabaseKey
+    key: resolvedSupabaseKey,
+    rockslide: {
+      radiusMeters: 1000,
+      rpcName: "check_rockslide_risk_near_point",
+      schemaCandidates: ["skredfaresoner_309c116d2f944bae99c20d0a1336a2bd", "public"],
+      requirePostgisRpc: true,
+      tableCandidates: [
+        "skredfaresone"
+      ],
+      rockslideTypeKeywords: ["stein", "rock"]
+    }
   }
 };
 
@@ -49,7 +169,6 @@ const supabase = config.supabase.url && config.supabase.key
 const root = document.getElementById("app");
 root.innerHTML = `
   <aside class="panel">
-    <p class="badge">Oppgave 1 • GIS</p>
     <h1>Kriseveier for spesialkjøretøy</h1>
     <p>Vegnett og restriksjoner lastes dynamisk fra NVDB basert på kartutsnitt.</p>
 
@@ -117,9 +236,13 @@ root.innerHTML = `
         <label class="control-row">
           <input type="checkbox" id="toggle-tunnels" /> Tunneler
         </label>
+        <label class="control-row">
+          <input type="checkbox" id="toggle-vehicle-details" /> Kjøretøy detaljer
+        </label>
       </div>
       <button id="load-supabase" disabled>Last data fra Supabase</button>
       <p class="note" id="supabase-status">Kobler til database...</p>
+      <p class="note" id="rockslide-status">Klikk i kartet for å sjekke steinskredfare innen 1 km.</p>
     </section>
   </aside>
   <main id="map"></main>
@@ -151,6 +274,21 @@ let hideTooNarrowRoads = false;
 
 let vehicleHeightMeters = null;
 let hideTooLowRoads = false;
+
+let selectedPointMarker = null;
+let rockslideRequestId = 0;
+
+function setSelectedPointMarker(lngLat) {
+  if (selectedPointMarker) {
+    selectedPointMarker.remove();
+  }
+
+  const el = document.createElement("div");
+  el.className = "selected-point-marker";
+  selectedPointMarker = new maplibregl.Marker({ element: el, anchor: "center" })
+    .setLngLat(lngLat)
+    .addTo(map);
+}
 
 function addElvegLayer() {
   const wmsTileUrl = `${config.elveg.wmsUrl}?SERVICE=WMS&REQUEST=GetMap&VERSION=1.3.0&LAYERS=${config.elveg.layer}&STYLES=&FORMAT=image/png&TRANSPARENT=true&CRS=EPSG:3857&BBOX={bbox-epsg-3857}&WIDTH=256&HEIGHT=256`;
@@ -379,6 +517,16 @@ function addNvdbWeightLayer() {
       )
       .addTo(map);
   });
+
+  // Rockslide check on map click
+  map.on("click", async (event) => {
+    // Only check rockslide if Supabase is configured and we're not clicking on an existing feature
+    if (!supabase || !config.supabase.rockslide || event.features?.length > 0) {
+      return;
+    }
+    setSelectedPointMarker(event.lngLat);
+    await handleRockslideCheckAtPoint(event.lngLat);
+  });
 }
 
 
@@ -404,6 +552,278 @@ function normalizeNumber(value) {
   const normalized = text.replace(/\s/g, "").replace(",", ".");
   const parsed = Number(normalized);
   return Number.isFinite(parsed) ? parsed : null;
+}
+
+function isLikelyWgs84LngLat(lng, lat) {
+  return (
+    Number.isFinite(lng) &&
+    Number.isFinite(lat) &&
+    Math.abs(lng) <= 180 &&
+    Math.abs(lat) <= 90
+  );
+}
+
+function toWgs84LngLat(x, y) {
+  if (!Number.isFinite(x) || !Number.isFinite(y)) return null;
+
+  if (isLikelyWgs84LngLat(x, y)) {
+    return [x, y];
+  }
+
+  try {
+    return convertUTM33toWGS84(x, y);
+  } catch {
+    return null;
+  }
+}
+
+function representativeCoordFromGeometry(geometry) {
+  if (!geometry || typeof geometry !== "object") return null;
+  const coords = geometry.coordinates;
+  if (!Array.isArray(coords)) return null;
+
+  switch (geometry.type) {
+    case "Point":
+      return Array.isArray(coords) && coords.length >= 2 ? coords : null;
+    case "LineString":
+    case "MultiPoint":
+      return lineMidpoint(coords);
+    case "Polygon": {
+      const ring = Array.isArray(coords[0]) ? coords[0] : null;
+      return Array.isArray(ring) && ring.length ? ring[Math.floor(ring.length / 2)] : null;
+    }
+    case "MultiLineString": {
+      const line = Array.isArray(coords[0]) ? coords[0] : null;
+      return Array.isArray(line) && line.length ? line[Math.floor(line.length / 2)] : null;
+    }
+    case "MultiPolygon": {
+      const ring = Array.isArray(coords[0]) && Array.isArray(coords[0][0]) ? coords[0][0] : null;
+      return Array.isArray(ring) && ring.length ? ring[Math.floor(ring.length / 2)] : null;
+    }
+    default:
+      return null;
+  }
+}
+
+function normalizeRockslideCheckResult(result, radiusMeters) {
+  if (typeof result === "boolean") {
+    return {
+      atRisk: result,
+      count: result ? 1 : 0,
+      nearestMeters: null,
+      source: "rpc"
+    };
+  }
+
+  if (Array.isArray(result) && result.length > 0 && typeof result[0] === "object" && result[0]) {
+    const row = result[0];
+    const atRisk =
+      Boolean(row.at_risk) ||
+      Boolean(row.is_at_risk) ||
+      (Number.isFinite(Number(row.count)) && Number(row.count) > 0);
+    const nearestMeters =
+      Number(row.nearest_m ?? row.nearest_distance_m ?? row.min_distance_m);
+    const count = Number(row.count ?? row.match_count ?? row.hits ?? 0);
+    return {
+      atRisk,
+      count: Number.isFinite(count) ? count : atRisk ? 1 : 0,
+      nearestMeters: Number.isFinite(nearestMeters) ? nearestMeters : null,
+      source: "rpc"
+    };
+  }
+
+  if (result && typeof result === "object") {
+    const atRisk =
+      Boolean(result.at_risk) ||
+      Boolean(result.is_at_risk) ||
+      (Number.isFinite(Number(result.count)) && Number(result.count) > 0);
+    const nearestMeters = Number(result.nearest_m ?? result.nearest_distance_m ?? result.min_distance_m);
+    const count = Number(result.count ?? result.match_count ?? result.hits ?? 0);
+    return {
+      atRisk,
+      count: Number.isFinite(count) ? count : atRisk ? 1 : 0,
+      nearestMeters: Number.isFinite(nearestMeters) ? nearestMeters : null,
+      source: "rpc"
+    };
+  }
+
+  return {
+    atRisk: false,
+    count: 0,
+    nearestMeters: null,
+    source: "rpc"
+  };
+}
+
+function extractLngLatFromRow(row) {
+  if (!row || typeof row !== "object") return null;
+
+  const directLng = normalizeNumber(row.lng ?? row.lon ?? row.longitude ?? row.x);
+  const directLat = normalizeNumber(row.lat ?? row.latitude ?? row.y);
+  if (Number.isFinite(directLng) && Number.isFinite(directLat)) {
+    const converted = toWgs84LngLat(directLng, directLat);
+    if (converted) return converted;
+  }
+
+  const rawGeom = row.geom ?? row.geometry ?? row.geojson ?? row.omrade ?? row.grense;
+  const geom = rawGeom?.type === "Feature" ? rawGeom.geometry : rawGeom;
+  if (geom && typeof geom === "object") {
+    const coord = representativeCoordFromGeometry(geom);
+    if (Array.isArray(coord) && coord.length >= 2) {
+      const x = Number(coord[0]);
+      const y = Number(coord[1]);
+      const converted = toWgs84LngLat(x, y);
+      if (converted) return converted;
+    }
+  }
+
+  return null;
+}
+
+async function checkRockslideRiskNearPoint(lngLat) {
+  const radiusMeters = config.supabase.rockslide.radiusMeters;
+  const schemaCandidates =
+    config.supabase.rockslide.schemaCandidates?.length
+      ? config.supabase.rockslide.schemaCandidates
+      : ["public"];
+  const requirePostgisRpc = config.supabase.rockslide.requirePostgisRpc !== false;
+
+  if (!supabase) {
+    throw new Error("Supabase er ikke konfigurert.");
+  }
+
+  const [lng, lat] = lngLat;
+
+  const schemaClient = (schemaName) =>
+    schemaName === "public" || typeof supabase.schema !== "function"
+      ? supabase
+      : supabase.schema(schemaName);
+  const rockslideTypeKeywords = (config.supabase.rockslide.rockslideTypeKeywords || []).map((word) =>
+    String(word || "").toLowerCase().trim()
+  );
+
+  let lastError = null;
+  for (const schemaName of schemaCandidates) {
+    const { data: rpcData, error: rpcError } = await schemaClient(schemaName).rpc(
+      config.supabase.rockslide.rpcName,
+      {
+        p_lng: lng,
+        p_lat: lat,
+        p_radius_m: radiusMeters
+      }
+    );
+
+    if (!rpcError) {
+      const result = normalizeRockslideCheckResult(rpcData, radiusMeters);
+      result.source = `rpc:${schemaName}.${config.supabase.rockslide.rpcName}`;
+      return result;
+    }
+
+    lastError = rpcError;
+  }
+
+  if (requirePostgisRpc) {
+    throw new Error(
+      `Mangler RPC for PostGIS. Opprett ${schemaCandidates[0]}.${config.supabase.rockslide.rpcName} med ST_DWithin for 1 km-sjekk.`
+    );
+  }
+
+  for (const schemaName of schemaCandidates) {
+    for (const tableName of config.supabase.rockslide.tableCandidates) {
+      const { data, error } = await schemaClient(schemaName)
+        .from(tableName)
+        .select("*")
+        .limit(5000);
+      if (error) {
+        lastError = error;
+        continue;
+      }
+
+      const scopedRows = (data || []).filter((row) => {
+        if (!rockslideTypeKeywords.length) return true;
+        const typeText = String(row?.skredtype ?? row?.objtype ?? "").toLowerCase();
+        if (!typeText) return true;
+        return rockslideTypeKeywords.some((keyword) => typeText.includes(keyword));
+      });
+
+      const matches = [];
+      let nearestMeters = Infinity;
+      let rowsWithGeometryWithoutPoint = 0;
+      for (const row of scopedRows) {
+        const targetPoint = extractLngLatFromRow(row);
+        if (!targetPoint) {
+          if (row?.omrade || row?.grense || row?.geom || row?.geometry) {
+            rowsWithGeometryWithoutPoint += 1;
+          }
+          continue;
+        }
+        const distMeters = haversineMeters(lngLat, targetPoint);
+        if (distMeters <= radiusMeters) {
+          matches.push(row);
+          nearestMeters = Math.min(nearestMeters, distMeters);
+        }
+      }
+
+      if (!matches.length && rowsWithGeometryWithoutPoint > 0) {
+        throw new Error(
+          `Tabellen ${schemaName}.${tableName} inneholder geometri som ikke kunne tolkes til punkt (selv etter 25833→4326-konvertering). Lag eller bruk RPC ${schemaName}.${config.supabase.rockslide.rpcName} for presis avstandssjekk.`
+        );
+      }
+
+      return {
+        atRisk: matches.length > 0,
+        count: matches.length,
+        nearestMeters: Number.isFinite(nearestMeters) ? nearestMeters : null,
+        source: `table:${schemaName}.${tableName}`
+      };
+    }
+  }
+
+  throw new Error(
+    lastError?.message ||
+      "Fant ikke gyldig RPC eller tabell for steinskreddata i skredfaresoner/public."
+  );
+}
+
+async function handleRockslideCheckAtPoint(lngLat) {
+  const statusEl = document.getElementById("rockslide-status");
+  const currentRequestId = ++rockslideRequestId;
+  if (statusEl) {
+    statusEl.textContent = "Sjekker steinskredfare innen 1 km...";
+  }
+
+  try {
+    const result = await checkRockslideRiskNearPoint([lngLat.lng, lngLat.lat]);
+    if (currentRequestId !== rockslideRequestId) return;
+
+    const nearestText = Number.isFinite(result.nearestMeters)
+      ? ` Nærmeste funn: ${result.nearestMeters.toFixed(0)} m.`
+      : "";
+
+    const message = result.atRisk
+      ? `Risiko funnet innen 1 km (${result.count} treff).${nearestText}`
+      : "Ingen registrert steinskredrisiko innen 1 km.";
+
+    if (statusEl) {
+      statusEl.textContent = message;
+    }
+
+    new maplibregl.Popup()
+      .setLngLat(lngLat)
+      .setHTML(
+        `<strong>Steinskred-sjekk</strong><br/>${message}<br/>Kilde: ${result.source}`
+      )
+      .addTo(map);
+  } catch (error) {
+    if (currentRequestId !== rockslideRequestId) return;
+    if (statusEl) {
+      statusEl.textContent = `Feil i steinskredsjekk: ${error.message}`;
+    }
+    new maplibregl.Popup()
+      .setLngLat(lngLat)
+      .setHTML(`<strong>Steinskred-sjekk</strong><br/>Feil: ${error.message}`)
+      .addTo(map);
+  }
 }
 
 function haversineMeters(aLngLat, bLngLat) {
@@ -880,35 +1300,82 @@ loadSupabase.addEventListener("click", async () => {
   }
   
   const statusEl = document.getElementById("supabase-status");
+  const toggleRoadSegments = document.getElementById("toggle-road-segments");
+  const toggleTunnels = document.getElementById("toggle-tunnels");
+  const toggleVehicleDetails = document.getElementById("toggle-vehicle-details");
+  
+  // Sjekk hvilke som er valgt
+  const shouldFetchRoadSegments = toggleRoadSegments?.checked;
+  const shouldFetchTunnels = toggleTunnels?.checked;
+  const shouldFetchVehicleDetails = toggleVehicleDetails?.checked;
+  
+  if (!shouldFetchRoadSegments && !shouldFetchTunnels && !shouldFetchVehicleDetails) {
+    alert("Velg minst en datasource: Vegsegmenter, Tunneler eller Kjøretøy detaljer");
+    return;
+  }
   
   try {
-    // Test tilkoblingen først
-    if (statusEl) statusEl.textContent = "Tester tilkobling...";
+    if (statusEl) statusEl.textContent = "Henter data...";
     
-    // Hent data fra road_segments
-    const { data: roadData, error: roadError } = await supabase
-      .from('road_segments')
-      .select('*')
-      .limit(10);
+    let roadData = null;
+    let tunnelData = null;
+    let vehicleData = null;
     
-    if (roadError) throw roadError;
+    // Hent data fra road_segments hvis valgt
+    if (shouldFetchRoadSegments) {
+      const { data, error } = await supabase
+        .from('road_segments')
+        .select('*')
+        .limit(50);
+      if (error) throw new Error(`Road segments: ${error.message}`);
+      roadData = data;
+    }
     
-    // Hent data fra tunnels
-    const { data: tunnelData, error: tunnelError } = await supabase
-      .from('tunnels')
-      .select('*')
-      .limit(10);
+    // Hent data fra tunnels hvis valgt
+    if (shouldFetchTunnels) {
+      const { data, error } = await supabase
+        .from('tunnels')
+        .select('*')
+        .limit(50);
+      if (error) throw new Error(`Tunnels: ${error.message}`);
+      tunnelData = data;
+    }
     
-    if (tunnelError) throw tunnelError;
+    // Hent data fra kjøretøy detaljer hvis valgt
+    if (shouldFetchVehicleDetails) {
+      const tableCandidates = ["Kjoretoy_detaljer", "kjoretoy_detaljer"];
+      let selectedTable = null;
+      let lastError = null;
+      
+      for (const tableName of tableCandidates) {
+        const { data, error } = await supabase.from(tableName).select("*").limit(50);
+        if (!error) {
+          selectedTable = tableName;
+          vehicleData = data || [];
+          break;
+        }
+        lastError = error;
+      }
+      
+      if (!selectedTable) {
+        throw lastError || new Error("Fant ikke tabellen Kjoretoy_detaljer.");
+      }
+    }
     
     console.log('Road segments fra Supabase:', roadData);
     console.log('Tunnels fra Supabase:', tunnelData);
+    console.log('Kjøretøy detaljer fra Supabase:', vehicleData);
+    
+    const results = [];
+    if (shouldFetchRoadSegments) results.push(`${roadData?.length || 0} vegsegmenter`);
+    if (shouldFetchTunnels) results.push(`${tunnelData?.length || 0} tunneler`);
+    if (shouldFetchVehicleDetails) results.push(`${vehicleData?.length || 0} kjøretøy`);
     
     if (statusEl) {
-      statusEl.textContent = `✓ Tilkoblet! ${roadData?.length || 0} vegsegmenter, ${tunnelData?.length || 0} tunneler`;
+      statusEl.textContent = `✓ Tilkoblet! ${results.join(", ")}`;
     }
     
-    alert(`Supabase fungerer!\n\nVegsegmenter: ${roadData?.length || 0}\nTunneler: ${tunnelData?.length || 0}\n\nSe konsollen for detaljer.`);
+    alert(`Supabase fungerer!\n\n${results.join("\n")}\n\nSe konsollen for detaljer.`);
     
   } catch (err) {
     console.error('Feil ved henting fra Supabase:', err);
