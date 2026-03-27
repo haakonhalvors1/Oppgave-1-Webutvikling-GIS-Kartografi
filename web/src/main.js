@@ -169,7 +169,6 @@ const supabase = config.supabase.url && config.supabase.key
 const root = document.getElementById("app");
 root.innerHTML = `
   <aside class="panel">
-    <p class="badge">Oppgave 1 • GIS</p>
     <h1>Kriseveier for spesialkjøretøy</h1>
     <p>Vegnett og restriksjoner lastes dynamisk fra NVDB basert på kartutsnitt.</p>
 
@@ -232,7 +231,13 @@ root.innerHTML = `
       <h3>Supabase Database</h3>
       <div class="layer-list">
         <label class="control-row">
-          <input type="checkbox" checked disabled /> Kjøretøydetaljer
+          <input type="checkbox" id="toggle-road-segments" /> Vegsegmenter
+        </label>
+        <label class="control-row">
+          <input type="checkbox" id="toggle-tunnels" /> Tunneler
+        </label>
+        <label class="control-row">
+          <input type="checkbox" id="toggle-vehicle-details" /> Kjøretøy detaljer
         </label>
       </div>
       <button id="load-supabase" disabled>Last data fra Supabase</button>
@@ -269,6 +274,7 @@ let hideTooNarrowRoads = false;
 
 let vehicleHeightMeters = null;
 let hideTooLowRoads = false;
+
 let selectedPointMarker = null;
 let rockslideRequestId = 0;
 
@@ -511,6 +517,16 @@ function addNvdbWeightLayer() {
       )
       .addTo(map);
   });
+
+  // Rockslide check on map click
+  map.on("click", async (event) => {
+    // Only check rockslide if Supabase is configured and we're not clicking on an existing feature
+    if (!supabase || !config.supabase.rockslide || event.features?.length > 0) {
+      return;
+    }
+    setSelectedPointMarker(event.lngLat);
+    await handleRockslideCheckAtPoint(event.lngLat);
+  });
 }
 
 
@@ -555,15 +571,10 @@ function toWgs84LngLat(x, y) {
   }
 
   try {
-    const [lng, lat] = convertUTM33toWGS84(x, y);
-    if (isLikelyWgs84LngLat(Number(lng), Number(lat))) {
-      return [Number(lng), Number(lat)];
-    }
+    return convertUTM33toWGS84(x, y);
   } catch {
-    // Ignore conversion errors and fall through.
+    return null;
   }
-
-  return null;
 }
 
 function representativeCoordFromGeometry(geometry) {
@@ -592,29 +603,6 @@ function representativeCoordFromGeometry(geometry) {
     default:
       return null;
   }
-}
-
-function haversineMeters(aLngLat, bLngLat) {
-  const [lon1, lat1] = aLngLat;
-  const [lon2, lat2] = bLngLat;
-  if (![lon1, lat1, lon2, lat2].every((n) => Number.isFinite(n))) return Infinity;
-
-  const R = 6371000;
-  const toRad = (deg) => (deg * Math.PI) / 180;
-  const dLat = toRad(lat2 - lat1);
-  const dLon = toRad(lon2 - lon1);
-  const phi1 = toRad(lat1);
-  const phi2 = toRad(lat2);
-
-  const sinDLat = Math.sin(dLat / 2);
-  const sinDLon = Math.sin(dLon / 2);
-  const h = sinDLat * sinDLat + Math.cos(phi1) * Math.cos(phi2) * sinDLon * sinDLon;
-  return 2 * R * Math.asin(Math.min(1, Math.sqrt(h)));
-}
-
-function lineMidpoint(coords) {
-  if (!Array.isArray(coords) || coords.length === 0) return null;
-  return coords[Math.floor(coords.length / 2)] ?? null;
 }
 
 function normalizeRockslideCheckResult(result, radiusMeters) {
@@ -699,6 +687,7 @@ async function checkRockslideRiskNearPoint(lngLat) {
       ? config.supabase.rockslide.schemaCandidates
       : ["public"];
   const requirePostgisRpc = config.supabase.rockslide.requirePostgisRpc !== false;
+
   if (!supabase) {
     throw new Error("Supabase er ikke konfigurert.");
   }
@@ -835,6 +824,29 @@ async function handleRockslideCheckAtPoint(lngLat) {
       .setHTML(`<strong>Steinskred-sjekk</strong><br/>Feil: ${error.message}`)
       .addTo(map);
   }
+}
+
+function haversineMeters(aLngLat, bLngLat) {
+  const [lon1, lat1] = aLngLat;
+  const [lon2, lat2] = bLngLat;
+  if (![lon1, lat1, lon2, lat2].every((n) => Number.isFinite(n))) return Infinity;
+
+  const R = 6371000;
+  const toRad = (deg) => (deg * Math.PI) / 180;
+  const dLat = toRad(lat2 - lat1);
+  const dLon = toRad(lon2 - lon1);
+  const phi1 = toRad(lat1);
+  const phi2 = toRad(lat2);
+
+  const sinDLat = Math.sin(dLat / 2);
+  const sinDLon = Math.sin(dLon / 2);
+  const h = sinDLat * sinDLat + Math.cos(phi1) * Math.cos(phi2) * sinDLon * sinDLon;
+  return 2 * R * Math.asin(Math.min(1, Math.sqrt(h)));
+}
+
+function lineMidpoint(coords) {
+  if (!Array.isArray(coords) || coords.length === 0) return null;
+  return coords[Math.floor(coords.length / 2)] ?? null;
 }
 
 function buildSpatialIndex(points, cellSizeDegrees) {
@@ -1215,11 +1227,6 @@ map.on("moveend", () => {
   scheduleNvdbFetch();
 });
 
-map.on("click", (event) => {
-  setSelectedPointMarker(event.lngLat);
-  handleRockslideCheckAtPoint(event.lngLat);
-});
-
 const toggleRoadnet = document.getElementById("toggle-roadnet");
 const toggleElveg = document.getElementById("toggle-elveg");
 const toggleHeight = document.getElementById("toggle-height");
@@ -1293,39 +1300,82 @@ loadSupabase.addEventListener("click", async () => {
   }
   
   const statusEl = document.getElementById("supabase-status");
+  const toggleRoadSegments = document.getElementById("toggle-road-segments");
+  const toggleTunnels = document.getElementById("toggle-tunnels");
+  const toggleVehicleDetails = document.getElementById("toggle-vehicle-details");
+  
+  // Sjekk hvilke som er valgt
+  const shouldFetchRoadSegments = toggleRoadSegments?.checked;
+  const shouldFetchTunnels = toggleTunnels?.checked;
+  const shouldFetchVehicleDetails = toggleVehicleDetails?.checked;
+  
+  if (!shouldFetchRoadSegments && !shouldFetchTunnels && !shouldFetchVehicleDetails) {
+    alert("Velg minst en datasource: Vegsegmenter, Tunneler eller Kjøretøy detaljer");
+    return;
+  }
   
   try {
-    // Test tilkoblingen først
-    if (statusEl) statusEl.textContent = "Tester tilkobling...";
+    if (statusEl) statusEl.textContent = "Henter data...";
     
-    const tableCandidates = ["Kjoretoy_detaljer", "kjoretoy_detaljer"];
-    let selectedTable = null;
-    let rows = [];
-    let lastError = null;
-
-    for (const tableName of tableCandidates) {
-      const { data, error } = await supabase.from(tableName).select("*").limit(50);
-      if (!error) {
-        selectedTable = tableName;
-        rows = data || [];
-        break;
+    let roadData = null;
+    let tunnelData = null;
+    let vehicleData = null;
+    
+    // Hent data fra road_segments hvis valgt
+    if (shouldFetchRoadSegments) {
+      const { data, error } = await supabase
+        .from('road_segments')
+        .select('*')
+        .limit(50);
+      if (error) throw new Error(`Road segments: ${error.message}`);
+      roadData = data;
+    }
+    
+    // Hent data fra tunnels hvis valgt
+    if (shouldFetchTunnels) {
+      const { data, error } = await supabase
+        .from('tunnels')
+        .select('*')
+        .limit(50);
+      if (error) throw new Error(`Tunnels: ${error.message}`);
+      tunnelData = data;
+    }
+    
+    // Hent data fra kjøretøy detaljer hvis valgt
+    if (shouldFetchVehicleDetails) {
+      const tableCandidates = ["Kjoretoy_detaljer", "kjoretoy_detaljer"];
+      let selectedTable = null;
+      let lastError = null;
+      
+      for (const tableName of tableCandidates) {
+        const { data, error } = await supabase.from(tableName).select("*").limit(50);
+        if (!error) {
+          selectedTable = tableName;
+          vehicleData = data || [];
+          break;
+        }
+        lastError = error;
       }
-      lastError = error;
+      
+      if (!selectedTable) {
+        throw lastError || new Error("Fant ikke tabellen Kjoretoy_detaljer.");
+      }
     }
-
-    if (!selectedTable) {
-      throw lastError || new Error("Fant ikke tabellen Kjoretoy_detaljer.");
-    }
-
-    console.log(`Data fra Supabase-tabell ${selectedTable}:`, rows);
-
+    
+    console.log('Road segments fra Supabase:', roadData);
+    console.log('Tunnels fra Supabase:', tunnelData);
+    console.log('Kjøretøy detaljer fra Supabase:', vehicleData);
+    
+    const results = [];
+    if (shouldFetchRoadSegments) results.push(`${roadData?.length || 0} vegsegmenter`);
+    if (shouldFetchTunnels) results.push(`${tunnelData?.length || 0} tunneler`);
+    if (shouldFetchVehicleDetails) results.push(`${vehicleData?.length || 0} kjøretøy`);
+    
     if (statusEl) {
-      statusEl.textContent = `✓ Tilkoblet! ${rows.length} rader fra ${selectedTable}`;
+      statusEl.textContent = `✓ Tilkoblet! ${results.join(", ")}`;
     }
-
-    alert(
-      `Supabase fungerer!\n\nTabell: ${selectedTable}\nAntall rader hentet: ${rows.length}\n\nSe konsollen for detaljer.`
-    );
+    
+    alert(`Supabase fungerer!\n\n${results.join("\n")}\n\nSe konsollen for detaljer.`);
     
   } catch (err) {
     console.error('Feil ved henting fra Supabase:', err);
