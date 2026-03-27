@@ -156,4 +156,13 @@ button:active {
   background: #f59e0b;
 }
 
+.selected-point-marker {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #dc2626;
+  border: 2px solid #ffffff;
+  box-shadow: 0 0 0 2px rgba(220, 38, 38, 0.35);
+}
+
 
