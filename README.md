@@ -228,3 +228,71 @@ Bearing-beregninger brukes for å fastsette retningen på veglenker. Kjørefelt 
 - **WKT-parsing**: NVDB bruker WKT for geometri, noe som krever custom parsing i frontend. En backend med PostGIS kunne konvertert dette til standardisert GeoJSON.
 - **CORS og proxying**: Vite proxy er perfekt for utvikling, men produksjon krever enten CORS-headers fra NVDB eller egen backend-proxy.
 - **MapLibre filters**: Expression-baserte filters er kraftige, men debugging kan være vanskelig. Konsoll-logging av feature properties var essensielt under utvikling. 
+
+
+
+
+
+## Oppgave 2: Romlig Analyse og Spatial SQL
+
+### Del A: Jupyter Notebook - Romlig Analyse
+
+**Tematikk:** Infrastrukturs-kritikalitet for krisekjøretøy
+
+Analysen kartlegger fremkommeligheten for spesialkjøretøy i Kristiansand gjennom undersøkelse av veirestriksjoner (broer, vegbredde) og terrengutfordringer.
+
+**Notebook:** [Notebook.ipynb](Notebook.ipynb)
+
+**Datasett:**
+- Vegnett fra OpenStreetMap (E18, riksveier 9, 41)
+- NVDB vegbredde (838) og høydebegrensning (591)
+- Høydedata (DEM, 10m oppløsning)
+
+**Analyser:**
+- **Buffer**: 50m rundt broer + kjøretøyfiltrering (5m bred)
+- **Overlay**: Union av vegbredde og høydebegrensning
+- **Aggregering**: Veitetthet per kommune
+- **Raster**: Slope-analyse (>30°), hillshade (3 varianter), polygonisering
+
+---
+
+### Del B: Utvidelse av Webkart - Spatial SQL
+
+**Beskrivelse av utvidelsen:**
+Vi har lagt til en funksjon hvor bruker kan trykke på kartet, og det vil komme en boks som forteller bruker om det er skredfare innenfor 1 km radius fra punktet i kartet. Vi har også endret hent data fra supabase knappen, og koblet den til supabase. Nå velger bruker via filter hvilke data de ønsker, også blir disse vist ved trykk på knappen. Den siste endringen som er gjort er utseende. Vi har gjort knapper og skrift mer oversiktlig og penere å se på. 
+
+**Demo:**
+[GIF eller video som viser funksjonaliteten]
+
+**Notebook-guide:** [Notebook.ipynb](Notebook.ipynb)
+
+**SQL-snippet:**
+```sql
+-- PostGIS RPC-funksjon for skredfare-analyse
+CREATE OR REPLACE FUNCTION check_rockslide_risk_near_point(
+  p_lng FLOAT,
+  p_lat FLOAT,
+  p_radius_m FLOAT
+)
+RETURNS TABLE(id TEXT, name TEXT, distance_m FLOAT) AS $$
+BEGIN
+  RETURN QUERY
+  SELECT 
+    skredfaresone::TEXT,
+    skredfaresone AS name,
+    ST_Distance(
+      ST_SetSRID(ST_MakePoint(p_lng, p_lat), 4326)::geography,
+      geom::geography
+    ) AS distance_m
+  FROM skredfaresoner_309c116d2f944bae99c20d0a1336a2bd
+  WHERE ST_DWithin(
+    ST_SetSRID(ST_MakePoint(p_lng, p_lat), 4326)::geography,
+    geom::geography,
+    p_radius_m
+  )
+  ORDER BY distance_m;
+END;
+$$ LANGUAGE plpgsql;
+```
+
+**Implementering:** RPC-funksjonen kalles når bruker klikker i kartet. Koordinatene sendes til Supabase hvor PostGIS bruker `ST_DWithin()` til å finne alle skredfaresoner innenfor angitt radius (1000m). Resultatet vises som popup og highlighting på kartet.
