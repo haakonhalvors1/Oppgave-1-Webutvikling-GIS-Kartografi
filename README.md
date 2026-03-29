@@ -262,7 +262,7 @@ Analysen kartlegger fremkommeligheten for spesialkjøretøy i Kristiansand gjenn
 Vi har lagt til en funksjon hvor bruker kan trykke på kartet, og det vil komme en boks som forteller bruker om det er skredfare innenfor 1 km radius fra punktet i kartet. Vi har også endret hent data fra supabase knappen, og koblet den til supabase. Nå velger bruker via filter hvilke data de ønsker, også blir disse vist ved trykk på knappen. Den siste endringen som er gjort er utseende. Vi har gjort knapper og skrift mer oversiktlig og penere å se på. 
 
 **Demo:**
-[GIF eller video som viser funksjonaliteten]
+(https://drive.google.com/file/d/1CnfJAZy6spiPzGyZhNQ-cvNLks4wNKtB/view?usp=sharing)
 
 **Notebook-guide:** [Notebook.ipynb](Notebook.ipynb)
 
@@ -274,25 +274,31 @@ CREATE OR REPLACE FUNCTION check_rockslide_risk_near_point(
   p_lat FLOAT,
   p_radius_m FLOAT
 )
-RETURNS TABLE(id TEXT, name TEXT, distance_m FLOAT) AS $$
+RETURNS TABLE(at_risk BOOLEAN, count INTEGER, nearest_distance_m FLOAT) AS $$
 BEGIN
   RETURN QUERY
   SELECT 
-    skredfaresone::TEXT,
-    skredfaresone AS name,
-    ST_Distance(
-      ST_SetSRID(ST_MakePoint(p_lng, p_lat), 4326)::geography,
-      geom::geography
-    ) AS distance_m
+    (COUNT(*) > 0)::BOOLEAN AS at_risk,
+    COUNT(*)::INTEGER AS count,
+    MIN(
+      ST_Distance(
+        ST_SetSRID(ST_MakePoint(p_lng, p_lat), 4326)::geography,
+        geom::geography
+      )
+    )::FLOAT AS nearest_distance_m
   FROM skredfaresoner_309c116d2f944bae99c20d0a1336a2bd
   WHERE ST_DWithin(
     ST_SetSRID(ST_MakePoint(p_lng, p_lat), 4326)::geography,
     geom::geography,
     p_radius_m
-  )
-  ORDER BY distance_m;
+  );
 END;
 $$ LANGUAGE plpgsql;
 ```
 
-**Implementering:** RPC-funksjonen kalles når bruker klikker i kartet. Koordinatene sendes til Supabase hvor PostGIS bruker `ST_DWithin()` til å finne alle skredfaresoner innenfor angitt radius (1000m). Resultatet vises som popup og highlighting på kartet.
+**Implementering:** RPC-funksjonen kalles når bruker klikker i kartet. Koordinatene sendes til Supabase hvor PostGIS bruker `ST_DWithin()` til å finne alle skredfaresoner innenfor angitt radius (1000m). Funksjonen returnerer et sammendrag med:
+- `at_risk`: boolean som indikerer om det finnes skredfare
+- `count`: antall skredfaresoner funnet
+- `nearest_distance_m`: avstand (i meter) til nærmeste skredfaresone
+
+Resultatet normaliseres av frontenden og vises som popup og highlighting på kartet.
