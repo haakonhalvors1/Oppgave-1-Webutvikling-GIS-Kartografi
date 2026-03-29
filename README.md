@@ -7,7 +7,7 @@ Interaktivt webkart for planlegging av transport med spesialkjøretøy basert p�
 
 Dette kartet løser problemet med å identifisere kjørbare veier for store kjøretøy ved å visualisere vegbredde, høydebegrensninger og bruksklasser dynamisk fra NVDB. Brukeren kan angi kjøretøyets bredde og filtrere bort veier som er for smale, samt se detaljert informasjon om veglenker inkludert kjøreretning og antall kjørefelt. Kartet henter data i sanntid basert på kartutsnitt, slik at man alltid får oppdatert informasjon om vegnettet i det valgte området.
 
-## Demo av system
+## Demo av system (oppgave 1)
 
 [https://github.com/haakonhalvors1/Oppgave-1-Webutvikling-GIS-Kartografi/assets/GIS%20Oppgave%201%20Demo.mp4](https://drive.google.com/file/d/1GB37qL-jWexJBuJD9KxtC86a5BB9RWg8/view?usp=sharing)
 
@@ -261,7 +261,7 @@ Analysen kartlegger fremkommeligheten for spesialkjøretøy i Kristiansand gjenn
 **Beskrivelse av utvidelsen:**
 Vi har lagt til en funksjon hvor bruker kan trykke på kartet, og det vil komme en boks som forteller bruker om det er skredfare innenfor 1 km radius fra punktet i kartet. Vi har også endret hent data fra supabase knappen, og koblet den til supabase. Nå velger bruker via filter hvilke data de ønsker, også blir disse vist ved trykk på knappen. Den siste endringen som er gjort er utseende. Vi har gjort knapper og skrift mer oversiktlig og penere å se på. 
 
-**Demo:**
+**Demo (Oppgave 2):**
 (https://drive.google.com/file/d/1CnfJAZy6spiPzGyZhNQ-cvNLks4wNKtB/view?usp=sharing)
 
 **Notebook-guide:** [Notebook.ipynb](Notebook.ipynb)
