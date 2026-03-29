@@ -1,6 +1,6 @@
 # Kriseveier for spesialkjøretøy
 
-> Interaktivt webkart for planlegging av transport med spesialkjøretøy basert på vegnett og restriksjonsdata fra NVDB (Nasjonal vegdatabank).
+Interaktivt webkart for planlegging av transport med spesialkjøretøy basert på vegnett og restriksjonsdata fra NVDB (Nasjonal vegdatabank).
 
 ## Prosjektnavn & TLDR
 **Prosjektnavn:** Kriseveier for spesialkjøretøy
