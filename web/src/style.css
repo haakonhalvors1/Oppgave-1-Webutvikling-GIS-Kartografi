@@ -114,6 +114,7 @@ button {
   transition: all 0.3s ease;
   font-weight: 600;
   box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+  width: 100%;
 }
 
 button:hover:not(:disabled) {
@@ -233,4 +234,28 @@ button:disabled {
 
 .maplibregl-popup-anchor-top .maplibregl-popup-tip {
   border-top-color: #667eea;
+}
+
+/* Responsive design for smaller screens */
+@media (max-width: 768px) {
+  #app {
+    grid-template-columns: 1fr;
+    grid-template-rows: auto 1fr;
+  }
+
+  .panel {
+    padding: 16px;
+    border-right: none;
+    border-bottom: 2px solid #667eea;
+    max-height: 40vh;
+    overflow-y: auto;
+  }
+
+  .panel h1 {
+    font-size: 20px;
+  }
+
+  .panel h3 {
+    font-size: 16px;
+  }
 }
