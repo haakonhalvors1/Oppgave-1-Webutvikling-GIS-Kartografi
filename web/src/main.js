@@ -1362,9 +1362,7 @@ loadSupabase.addEventListener("click", async () => {
       }
     }
     
-    console.log('Road segments fra Supabase:', roadData);
-    console.log('Tunnels fra Supabase:', tunnelData);
-    console.log('Kjøretøy detaljer fra Supabase:', vehicleData);
+    // Supabase data loaded successfully
     
     const results = [];
     if (shouldFetchRoadSegments) results.push(`${roadData?.length || 0} vegsegmenter`);
