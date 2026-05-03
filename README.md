@@ -2,22 +2,40 @@
 
 Interaktivt webkart for planlegging av transport med spesialkjøretøy basert på vegnett og restriksjonsdata fra NVDB (Nasjonal vegdatabank).
 
-## Prosjektnavn & TLDR
-**Prosjektnavn:** Kriseveier for spesialkjøretøy
+## InfraRoute - Kriseveier for spesialkjøretøy
+
 
 Dette kartet løser problemet med å identifisere kjørbare veier for store kjøretøy ved å visualisere vegbredde, høydebegrensninger og bruksklasser dynamisk fra NVDB. Brukeren kan angi kjøretøyets bredde og filtrere bort veier som er for smale, samt se detaljert informasjon om veglenker inkludert kjøreretning og antall kjørefelt. Kartet henter data i sanntid basert på kartutsnitt, slik at man alltid får oppdatert informasjon om vegnettet i det valgte området.
 
-## Demo av system (oppgave 1)
+## Demo av system
 
-[https://github.com/haakonhalvors1/Oppgave-1-Webutvikling-GIS-Kartografi/assets/GIS%20Oppgave%201%20Demo.mp4](https://drive.google.com/file/d/1GB37qL-jWexJBuJD9KxtC86a5BB9RWg8/view?usp=sharing)
+- **Demo Oppgave 1:** https://drive.google.com/file/d/1GB37qL-jWexJBuJD9KxtC86a5BB9RWg8/view?usp=sharing
+- **Demo Oppgave 2:** https://drive.google.com/file/d/1CnfJAZy6spiPzGyZhNQ-cvNLks4wNKtB/view?usp=sharing
+- **Demo Ferdig produkt:** https://drive.google.com/file/d/18L1O8_KvjrtxI3nclD9tCHddyP6_yICU/view?usp=sharing
 
 ### Funksjonalitet
 - Dynamisk lasting av vegnett fra NVDB basert på kartutsnitt
 - Visualisering av høydebegrensninger, vegbredde og bruksklasse (vekt)
-- Filtrering basert på kjøretøybredde med fargekoding (grønn = kjørbar, rød = for smal)
+- Filtrering basert på kjøretøybredde med fargekoding
 - Detaljert popup-informasjon med veglenkeretning, kjørefelt og restriksjoner
+- Sjekk for skredfare innenfor 1 km
 - Liste over kjørbare veier sortert etter vegbredde
 - WMS-lag fra Kartverket Elveg for komplett vegnettdekning
+
+## Demo Scenarioer
+
+Følgende korte guider forklarer hvordan du gjenskaper scenariene som vises i demo-videoen:
+
+- **Bytte og filtrere lag:** Bruk avkrysningsboksene i UI for å slå av/på lagene: NVDB vegnett, høydebegrensninger, vekt (bruksklasse), bredde og Elveg WMS-overlay. Lagene lastes dynamisk for gjeldende kartutsnitt.
+
+- **Skredfare-sjekk:** Klikk et punkt i kartet eller bruk "Sjekk skredfare"-knappen (UI) for å kjøre en spatial sjekk mot Supabase/PostGIS. Popup viser om det finnes skredfaresoner innenfor 1 km, antall treff og nærmeste avstand.
+
+- **Tank-scenario (eksempel):** Velg eller legg til et kjøretøy i UI, sett egenskaper (bredde, høyde) tilsvarende en tank. Aktiver filteret for kjøretøyets dimensjoner og kartet vil fargekode og skjule veglenker som ikke er kjørbare for kjøretøyet.
+
+- **Lastebil-scenario (eksempel):** Legg inn en lastebil i UI eller endre kjøretøyparametre til en typisk lastebil. Sett høydebegrensning lavere enn enkelte tunneler og merk at tunnellag eller veglenker med for lav frihøyde forsvinner fra visningen (de blir filtrert bort).
+
+
+Disse scenariene viser hvordan kombinasjonen av NVDB-restriksjoner og brukerdefinerte kjøretøyparametre brukes for å finne sikre ruter for spesialkjøretøy.
 
 ## Teknisk Stack
 
@@ -206,7 +224,10 @@ Oppgave-1-Webutvikling-GIS-Kartografi/
 
 ## Refleksjon
 
-Hva fungerer godt?
+Løsningen vi har laget fungerer slik vi ønsket, men er ikke helt optimalt for å taes i bruk. Vi er veldig fornøyde med mengde veidata vi har funnet, og lastet inn. Likevell merker vi at mye data mangler, slik som vegbredde og ligenende i gater i byer og nabolag. Dette gjør at filtreringen kun fungerer på hovedveier med data tilgjengelig. En annen ting med dataen vi har opplevd er at den noen steder sier fullstendig vegbredde, men at en betong-midtrabatt gjør det utilregnelig å kunne bruke hele vegbredden. 
+Likevell er vi veldig fornøyd med funksjonen av dataen vi har. Dersom en bruker skriver inn bredde på kjøretøy som er større enn veidataen, så vil veien bli filtert fort veldig raskt. Samme gjelder høyde. Da vil bruker kun se veier som er tilregnelige å kjøre på. Planen er at vekt også skal være mulig å skrive inn i seinere tid, men vi må være sikker på at dataen på dette er 100%
+
+### Hva er bra?
 
 Dynamisk datalasting
 Data hentes basert på gjeldende kartutsnitt, slik at bare relevante objekter lastes inn. Dette reduserer mengden data som behandles og gir bedre ytelse enn å hente hele datasettet. Debouncing på 350 ms begrenser antall API-kall ved panorering og zooming, og hindrer unødvendig belastning på tjenesten.
@@ -216,6 +237,7 @@ Metoden for å knytte vegbredde-punkter til riktige veglenker fungerer stabilt. 
 
 Retningsanalyse
 Bearing-beregninger brukes for å fastsette retningen på veglenker. Kjørefelt analyseres basert på nummerering, der partall går mot retning og oddetall med retning. Dette gir et bedre grunnlag for å forstå trafikkretning og struktur i vegnettet.
+
 
 ### Forbedringspunkter
 1. **Ytelse ved store datasett**: Ved zoom-nivå 10-12 i tettbygde områder kan 300 features være for mye. Skulle implementert clustering eller tile-basert vektordata (PMTiles/MVT).
@@ -233,9 +255,9 @@ Bearing-beregninger brukes for å fastsette retningen på veglenker. Kjørefelt 
 
 
 
-## Oppgave 2: Romlig Analyse og Spatial SQL
+## Romlig Analyse og Spatial SQL
 
-### Del A: Jupyter Notebook - Romlig Analyse
+### Jupyter Notebook - Romlig Analyse
 
 **Tematikk:** Infrastrukturs-kritikalitet for krisekjøretøy
 
@@ -256,7 +278,7 @@ Analysen kartlegger fremkommeligheten for spesialkjøretøy i Kristiansand gjenn
 
 ---
 
-### Del B: Utvidelse av Webkart - Spatial SQL
+### Utvidelse av Webkart - Spatial SQL
 
 **Beskrivelse av utvidelsen:**
 Vi har lagt til en funksjon hvor bruker kan trykke på kartet, og det vil komme en boks som forteller bruker om det er skredfare innenfor 1 km radius fra punktet i kartet. Vi har også endret hent data fra supabase knappen, og koblet den til supabase. Nå velger bruker via filter hvilke data de ønsker, også blir disse vist ved trykk på knappen. Den siste endringen som er gjort er utseende. Vi har gjort knapper og skrift mer oversiktlig og penere å se på. 
