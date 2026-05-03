@@ -2,9 +2,6 @@
 
 Interaktivt webkart for planlegging av transport med spesialkjøretøy basert på vegnett og restriksjonsdata fra NVDB (Nasjonal vegdatabank).
 
-## InfraRoute - Kriseveier for spesialkjøretøy
-
-
 Dette kartet løser problemet med å identifisere kjørbare veier for store kjøretøy ved å visualisere vegbredde, høydebegrensninger og bruksklasser dynamisk fra NVDB. Brukeren kan angi kjøretøyets bredde og filtrere bort veier som er for smale, samt se detaljert informasjon om veglenker inkludert kjøreretning og antall kjørefelt. Kartet henter data i sanntid basert på kartutsnitt, slik at man alltid får oppdatert informasjon om vegnettet i det valgte området.
 
 ## Demo av system
@@ -208,7 +205,9 @@ npm run preview
 Oppgave-1-Webutvikling-GIS-Kartografi/
 ├── LICENSE
 ├── README.md
-└── web/
+├── Notebook.ipynb              # Romlig analyse (Oppgave 2)
+├── data/                       # Lokale data
+└── web/                        # Webapplikasjon
     ├── index.html              # HTML entry point
     ├── package.json            # NPM dependencies og scripts
     ├── vite.config.js          # Vite config med NVDB proxy
